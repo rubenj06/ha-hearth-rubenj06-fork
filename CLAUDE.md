@@ -21,6 +21,7 @@ pnpm build               # production build into build/
 pnpm check:bundle        # gzipped eager-JS/CSS budget per route; run after build
 pnpm test:e2e            # Playwright against the production build; run `pnpm build` first
 pnpm matrix              # screenshot matrix -> matrix-output/index.html
+pnpm readme:image        # rebuilds docs/images/devices.png from the matrix fixture
 ```
 
 Single unit test: `pnpm exec vitest run src/lib/Hearth/store.test.ts` (add `-t "name"` to filter). Unit tests are `src/**/*.test.ts` (components use `*.svelte.test.ts`) in jsdom. Coverage thresholds in `vitest.config.ts` are a floor: raise, never lower.
@@ -85,7 +86,7 @@ Both registries have compile-time exhaustiveness checks against the union in `ty
 - `CHANGELOG.md` follows Common Changelog (see `docs/release.md`): an entry per release and no Unreleased section. Groups in order Changed/Added/Removed/Fixed, imperative items with commit or PR links, `**Breaking:**` first (includes config/format changes during 0.x). User-invisible changes are left out.
 - Versions have no `v` prefix. Releases need explicit confirmation before pushing or publishing (`docs/release.md`).
 
-Note: `src/lib/Hearth/README.md` links to `docs/architecture.md`, which does not exist. The layer rules above come from `scripts/check-boundaries.mjs`.
+Upstream's own reference lives in `docs/` (`architecture.md` for layers, ownership and known limits, `development.md` for setup and checks, `configuration.md`, `alerts.md`). Every file under `src/` must belong to a layer in `scripts/check-boundaries.mjs`, so a new top-level directory needs an entry there. The dashboard renders only in the browser (`ssr = false` in `src/routes/+layout.ts`); `src/hooks.server.ts` belongs to the routes layer.
 
 ## This repository is a fork
 

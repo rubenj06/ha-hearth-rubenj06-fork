@@ -1,8 +1,17 @@
 import { render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { selectedLanguage } from '$lib/core/i18n';
 import type { StyledClockWidget } from './descriptor';
 import Widget from './Widget.svelte';
+
+// the faces are imported on demand; let the import and the render settle
+async function renderClock(widget: StyledClockWidget) {
+	const result = render(Widget, { widget });
+	await vi.dynamicImportSettled();
+	await tick();
+	return result;
+}
 
 const clock = (fields: Partial<StyledClockWidget> = {}): StyledClockWidget => ({
 	id: 'styled',
@@ -23,8 +32,8 @@ describe('styled clock widget', () => {
 		vi.useRealTimers();
 	});
 
-	it('draws an analog face by default with hands at the current time', () => {
-		const { container } = render(Widget, { widget: clock() });
+	it('draws an analog face by default with hands at the current time', async () => {
+		const { container } = await renderClock(clock());
 		const face = screen.getByRole('img');
 		expect(face.tagName.toLowerCase()).toBe('svg');
 		expect(face.getAttribute('aria-label')).toMatch(/02:05|14:05/);
@@ -34,26 +43,26 @@ describe('styled clock widget', () => {
 		expect(container.querySelector('.date')?.textContent).toContain('January 15');
 	});
 
-	it('adds a second hand when seconds are shown', () => {
-		const { container } = render(Widget, { widget: clock({ show_seconds: true }) });
+	it('adds a second hand when seconds are shown', async () => {
+		const { container } = await renderClock(clock({ show_seconds: true }));
 		expect(container.querySelector('.second-hand')?.getAttribute('transform')).toBe(
 			'rotate(54 50 50)'
 		);
 	});
 
-	it('shows flip cards with the 24-hour digits', () => {
-		const { container } = render(Widget, {
-			widget: clock({ style: 'flip', hour_format: '24', show_seconds: true })
-		});
+	it('shows flip cards with the 24-hour digits', async () => {
+		const { container } = await renderClock(
+			clock({ style: 'flip', hour_format: '24', show_seconds: true })
+		);
 		const digits = [...container.querySelectorAll('.digit')].map((node) => node.textContent);
 		expect(digits).toEqual(['1', '4', '0', '5', '0', '9']);
 		expect(container.querySelector('.period')).toBeNull();
 	});
 
-	it('marks the day period on a 12-hour flip clock and can hide the date', () => {
-		const { container } = render(Widget, {
-			widget: clock({ style: 'flip', hour_format: '12', hide_date: true })
-		});
+	it('marks the day period on a 12-hour flip clock and can hide the date', async () => {
+		const { container } = await renderClock(
+			clock({ style: 'flip', hour_format: '12', hide_date: true })
+		);
 		const digits = [...container.querySelectorAll('.digit')].map((node) => node.textContent);
 		expect(digits).toEqual(['0', '2', '0', '5']);
 		expect(container.querySelector('.period')?.textContent).toBe('PM');
