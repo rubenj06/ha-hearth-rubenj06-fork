@@ -16,9 +16,6 @@
 	let attempt = $state(0);
 	let refreshed = $state(0);
 	const picture = $derived($states?.[entity]?.attributes?.entity_picture as string | undefined);
-	const streamType = $derived(
-		$states?.[entity]?.attributes?.frontend_stream_type as string | undefined
-	);
 	const poster = $derived(
 		picture ? `${picture}${picture.includes('?') ? '&' : '?'}t=${refreshed}` : undefined
 	);
@@ -30,7 +27,6 @@
 		const target = video;
 		const conn = $connection;
 		const id = entity;
-		const type = streamType;
 		void attempt;
 		playing = false;
 		failed = false;
@@ -38,7 +34,7 @@
 		const controller = new AbortController();
 		void import('$lib/core/ha/camera')
 			.then(({ playCamera }) =>
-				playCamera(conn, target, id, type, controller.signal, () => {
+				playCamera(conn, target, id, controller.signal, () => {
 					playing = false;
 					failed = true;
 				})
@@ -50,7 +46,8 @@
 	});
 </script>
 
-<div class="player">
+<!-- video controls scrub sideways; a page swipe must not start here -->
+<div class="player" data-no-swipe>
 	{#if poster && !playing}<img src={poster} alt="" />{/if}
 	<video
 		bind:this={video}

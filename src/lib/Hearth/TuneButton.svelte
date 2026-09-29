@@ -54,8 +54,10 @@
 			color var(--h-motion-fast) ease;
 	}
 
-	.tune:hover {
-		background: rgb(var(--h-surface-rgb) / calc(0.08 * var(--h-fill-scale)));
+	@media (hover: hover) {
+		.tune:hover {
+			background: rgb(var(--h-surface-rgb) / calc(0.08 * var(--h-fill-scale)));
+		}
 	}
 
 	.tune:active {

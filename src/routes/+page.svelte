@@ -186,6 +186,7 @@
 		justify-items: center;
 		gap: 12px;
 		width: 100%;
+		height: 100vh;
 		height: 100dvh;
 		padding: 24px;
 		background: var(--h-bg-1, #16110c); /* literal ok: fallback if theme tokens are missing */

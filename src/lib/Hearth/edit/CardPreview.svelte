@@ -53,10 +53,17 @@
 		cursor: pointer;
 	}
 
-	button:hover,
 	button.active {
 		border-color: rgb(var(--h-accent-rgb) / calc(0.35 * var(--h-accent-scale)));
 		background: rgb(var(--h-accent-rgb) / calc(0.1 * var(--h-accent-scale)));
 		color: var(--h-accent-text);
+	}
+
+	@media (hover: hover) {
+		button:hover {
+			border-color: rgb(var(--h-accent-rgb) / calc(0.35 * var(--h-accent-scale)));
+			background: rgb(var(--h-accent-rgb) / calc(0.1 * var(--h-accent-scale)));
+			color: var(--h-accent-text);
+		}
 	}
 </style>

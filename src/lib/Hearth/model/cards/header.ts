@@ -17,14 +17,16 @@ export const headerCard: CardDefinition<HeaderCard> = {
 		subtitle: trimmedOrUndefined(card.subtitle),
 		icon: trimmedOrUndefined(card.icon),
 		temp_entity: trimmedOrUndefined(card.temp_entity),
-		humidity_entity: trimmedOrUndefined(card.humidity_entity)
+		humidity_entity: trimmedOrUndefined(card.humidity_entity),
+		background_image: trimmedOrUndefined(card.background_image)
 	}),
 	schema: v.looseObject({
 		title: OptionalText,
 		subtitle: OptionalText,
 		icon: OptionalText,
 		temp_entity: OptionalEntityId,
-		humidity_entity: OptionalEntityId
+		humidity_entity: OptionalEntityId,
+		background_image: OptionalText
 	}),
 	needsConfiguration: () => false,
 	entityIds: (card) => [

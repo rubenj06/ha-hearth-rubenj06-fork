@@ -1,6 +1,7 @@
 import type { Action } from 'svelte/action';
 import type { SliderUpdateMode } from '$lib/core/app/configuration';
 import { vibrate } from '$lib/core/app/haptics';
+import { claimGesture } from '$lib/ui/gestures';
 
 interface DragOptions {
 	/** Updates the preview. `commit` says whether device state should also be sent. */
@@ -27,12 +28,20 @@ interface DragOptions {
 	 * range and step; whole percents would cap a 0-1000 range at steps of 10.
 	 */
 	precise?: boolean;
+	/**
+	 * A stationary tap without a `tap` handler commits the value under the
+	 * pointer, as a drag released there would.
+	 */
+	tapSets?: boolean;
 }
 
 /**
  * Horizontal drag-to-value with tap detection: movement up to 10px counts as a
  * tap, anything more sets a 0-100 value from the pointer's position within the
- * element. Apply `touch-action: none` on the element so touch drags work.
+ * element. A gesture that goes vertical first is abandoned, so under
+ * `touch-action: pan-y` a scroll the browser lets through does not end in a
+ * tap or a hold. Apply `touch-action: none` or `pan-y` on the element so touch
+ * drags work.
  */
 export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) => {
 	let current = options;
@@ -41,6 +50,7 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 		held: boolean;
 		pointerId: number;
 		startX: number;
+		startY: number;
 		lastStep: number;
 	} | null = null;
 	let holdTimer: ReturnType<typeof setTimeout> | undefined;
@@ -75,7 +85,14 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 
 	function handleDown(event: PointerEvent) {
 		if (current.disabled) return;
+		// A second finger, or another pointer while one is already dragging.
+		// A repeat of the tracked pointer means its release was lost, so restart.
+		if (event.isPrimary === false) return;
+		// a right or middle click, or a pen's barrel button, is not a drag or a tap
+		if (event.button > 0) return;
+		if (tracking && tracking.pointerId !== event.pointerId) return;
 		if (current.ignore && (event.target as Element).closest?.(current.ignore)) return;
+		claimGesture(event);
 		try {
 			node.setPointerCapture(event.pointerId);
 		} catch {
@@ -86,9 +103,11 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 			held: false,
 			pointerId: event.pointerId,
 			startX: event.clientX,
+			startY: event.clientY,
 			// the step under the finger, so staying inside it stays silent
 			lastStep: stepIndex(Math.round(fraction(event) * 100))
 		};
+		clearTimeout(holdTimer);
 		if (current.hold) {
 			holdTimer = setTimeout(() => {
 				if (!tracking || tracking.moved) return;
@@ -101,9 +120,17 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 
 	function handleMove(event: PointerEvent) {
 		if (!tracking || event.pointerId !== tracking.pointerId || tracking.held) return;
-		if (Math.abs(event.clientX - tracking.startX) > 10) {
-			tracking.moved = true;
-			clearTimeout(holdTimer);
+		if (!tracking.moved) {
+			const dx = Math.abs(event.clientX - tracking.startX);
+			const dy = Math.abs(event.clientY - tracking.startY);
+			if (dy > 10 && dy >= dx) {
+				finishTracking(event.pointerId);
+				return;
+			}
+			if (dx > 10) {
+				tracking.moved = true;
+				clearTimeout(holdTimer);
+			}
 		}
 		if (tracking.moved) {
 			const value = percent(event);
@@ -118,7 +145,7 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 			// the hold already acted; the release must not toggle on top of it
 		} else if (!tracking.moved && current.tap) {
 			current.tap();
-		} else if (tracking.moved) {
+		} else if (tracking.moved || current.tapSets) {
 			const value = percent(event);
 			// Always commit the final value. In release mode this is the gesture's
 			// only service call; in continuous mode it guarantees the exact endpoint.

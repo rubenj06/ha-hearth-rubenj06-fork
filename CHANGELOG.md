@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.5.1] - 2026-09-29
+
+### Fixed
+
+- Stack the media popup's queue under the player on phones, so the title, progress bar and playback buttons get the full width ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Keep a card's column count to at most two on phones, and show one tile per row while editing there ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Stop a vertical drag or a second finger on a light or blind tile from toggling it or opening its popup ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Set the value where you tap on a popup slider, and ignore right and middle clicks on sliders ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Allow pinch zoom to start on light and blind tiles ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Keep edit sheets, the entity picker, toasts, the edit button and the wide layout clear of the notch and the home indicator ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Stop iOS zooming in when a text field in the editor or search gets focus ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Truncate long edit sheet titles instead of pushing the close button off screen ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Keep toasts and the last widget clear of the edit bar when it wraps onto two rows ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Give drag handles, progress bars and volume bars a finger-sized touch area ([#19](https://github.com/knowald/ha-hearth/pull/19))
+- Shrink search and edit sheets with the on-screen keyboard on Android ([#19](https://github.com/knowald/ha-hearth/pull/19))
+
+## [0.5.0] - 2026-09-28
+
+### Changed
+
+- Show the notifications widget as one button with a count badge and the newest title, opening a list of alerts and Home Assistant notifications ([`2f6f489`](https://github.com/knowald/ha-hearth/commit/2f6f489))
+- Group the screensaver settings in their own Sleep screen section, with a button to preview it ([`2a5d6dd`](https://github.com/knowald/ha-hearth/commit/2a5d6dd))
+- Stop showing the https note under touch feedback in App settings ([`bbf9636`](https://github.com/knowald/ha-hearth/commit/bbf9636))
+
+### Added
+
+- Place the sidebar on the left, on the right, on both sides or hide it, and pick a side for each widget when there are two ([`80deda2`](https://github.com/knowald/ha-hearth/commit/80deda2))
+- Swipe sideways between pages, on phones and on wider screens where a mouse drag works like a finger, each with its own setting ([`9c54527`](https://github.com/knowald/ha-hearth/commit/9c54527))
+- Raise alerts from dashboard rules, such as a fridge door left open for two minutes, and close them again when the condition clears ([`2f6f489`](https://github.com/knowald/ha-hearth/commit/2f6f489))
+- Raise, dismiss and target alerts from Home Assistant automations through the `HEARTH` event, and open or close an entity popup the same way ([`2f6f489`](https://github.com/knowald/ha-hearth/commit/2f6f489))
+- Name each screen in App settings or with `?device=`, so an automation can send an alert to one screen ([`2f6f489`](https://github.com/knowald/ha-hearth/commit/2f6f489))
+- Wake the sleep screen when an alert pops up, and keep it awake while the alert shows ([`2f6f489`](https://github.com/knowald/ha-hearth/commit/2f6f489))
+- Show an image or a live weather radar map of the home location, or any other location, behind the sleep screen clock ([`2a5d6dd`](https://github.com/knowald/ha-hearth/commit/2a5d6dd))
+- Set the sleep screen clock size, show or hide the date, and show the current weather under the clock ([`2a5d6dd`](https://github.com/knowald/ha-hearth/commit/2a5d6dd))
+
+### Fixed
+
+- Stop the browser's own grey tap highlight, long-press menu and hover state that stayed on after a tap on touch screens, leaving only Hearth's press feedback ([`4ed7ae9`](https://github.com/knowald/ha-hearth/commit/4ed7ae9))
+
+## [0.4.0] - 2026-09-26
+
+### Added
+
+- Embed a web page as a card on any page, such as the Music Assistant interface, filling its column unless a height is set ([`e2b1748`](https://github.com/knowald/ha-hearth/commit/e2b1748))
+- Set a background image on header cards and the theme, from a URL or an image uploaded to Hearth, and manage uploaded images from the image field ([`6324403`](https://github.com/knowald/ha-hearth/commit/6324403))
+
+### Fixed
+
+- Play WebRTC-only cameras, such as Ring live view, instead of requesting an HLS stream they reject; Hearth now asks Home Assistant which stream types a camera supports and falls back to HLS when WebRTC fails on a camera that offers both ([`19b4bd7`](https://github.com/knowald/ha-hearth/commit/19b4bd7), [`756c09d`](https://github.com/knowald/ha-hearth/commit/756c09d))
+- Keep showing the snapshot of a camera that has no live stream instead of offering a Retry that cannot work ([`75799d8`](https://github.com/knowald/ha-hearth/commit/75799d8))
+- Load behind an nginx reverse proxy in front of Home Assistant, which rejected the page with a 502 because its preload `Link` header exceeded the default 4k proxy buffer ([`c9eee00`](https://github.com/knowald/ha-hearth/commit/c9eee00))
+
 ## [0.3.0] - 2026-09-23
 
 ### Changed
@@ -140,6 +192,9 @@
 
 - Keep the standard `backdrop-filter` in the built stylesheet; writing the `-webkit-` prefix by hand made the minifier drop it, so no blur in the application took effect
 
+[0.5.1]: https://github.com/knowald/ha-hearth/releases/tag/0.5.1
+[0.5.0]: https://github.com/knowald/ha-hearth/releases/tag/0.5.0
+[0.4.0]: https://github.com/knowald/ha-hearth/releases/tag/0.4.0
 [0.3.0]: https://github.com/knowald/ha-hearth/releases/tag/0.3.0
 [0.2.0]: https://github.com/knowald/ha-hearth/releases/tag/0.2.0
 [0.1.3]: https://github.com/knowald/ha-hearth/releases/tag/0.1.3

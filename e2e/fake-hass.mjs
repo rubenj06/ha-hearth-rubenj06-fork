@@ -7,9 +7,13 @@ import { WebSocketServer } from 'ws';
  * lives in memory and every connected client receives the same entity stream.
  * Recorder statistics, state history, calendar events, template renders and
  * weather forecasts are synthesized so data-driven widgets have something to
- * draw. Test endpoints: GET /_test/calls lists received service calls,
+ * draw. Camera capabilities and WebRTC signaling are answered without media.
+ * Test endpoints: GET /_test/calls lists received service calls,
+ * GET /_test/camera lists received camera/* messages,
  * POST /_test/reset restores the initial states and clears the call log,
- * POST /_test/state with { entity_id, state, attributes } patches one entity.
+ * POST /_test/state with { entity_id, state, attributes } patches one entity,
+ * POST /_test/fire_event with an event data object fires a HEARTH event at
+ * every subscribe_trigger subscription listening for it.
  */
 
 const PORT = Number(process.env.FAKE_HASS_PORT ?? 8124);
@@ -259,6 +263,10 @@ function initialStates() {
 			s: 'idle',
 			a: { friendly_name: 'Front camera', supported_features: 0 }
 		},
+		'camera.door': {
+			s: 'idle',
+			a: { friendly_name: 'Door camera', supported_features: 2 }
+		},
 		'image.floorplan': { s: '2026-09-01T00:00:00+00:00', a: { friendly_name: 'Floor plan' } },
 		'person.kevin': { s: 'home', a: { friendly_name: 'Kevin' } },
 		'device_tracker.phone': {
@@ -284,7 +292,13 @@ function initialStates() {
 
 let states = initialStates();
 let calls = [];
+let cameraRequests = [];
+// Stream types as Home Assistant reports them through camera/capabilities; the
+// door camera is WebRTC-only, like Ring live view.
+const cameraStreamTypes = { 'camera.front': [], 'camera.door': ['web_rtc'] };
 const entitySubscribers = new Map();
+// socket -> subscription ids of subscribe_trigger messages for HEARTH events
+const triggerSubscribers = new Map();
 
 function now() {
 	return Math.floor(Date.now() / 1000);
@@ -671,13 +685,54 @@ function handleMessage(socket, message) {
 				listeners: {}
 			});
 			return;
+		case 'camera/capabilities':
+			cameraRequests.push({ type: message.type, entity_id: message.entity_id });
+			reply({ frontend_stream_types: cameraStreamTypes[message.entity_id] ?? [] });
+			return;
+		case 'camera/stream':
+			cameraRequests.push({ type: message.type, entity_id: message.entity_id });
+			if (!cameraStreamTypes[message.entity_id]?.includes('hls')) {
+				socket.send(
+					JSON.stringify({
+						id: message.id,
+						type: 'result',
+						success: false,
+						error: {
+							code: 'home_assistant_error',
+							message: `${message.entity_id} does not support play stream service`
+						}
+					})
+				);
+				return;
+			}
+			reply({ url: '/api/hls/stream.m3u8' });
+			return;
+		case 'camera/webrtc/get_client_config':
+			cameraRequests.push({ type: message.type, entity_id: message.entity_id });
+			reply({ configuration: { iceServers: [] } });
+			return;
+		case 'camera/webrtc/offer':
+			cameraRequests.push({ type: message.type, entity_id: message.entity_id });
+			reply(null);
+			event({ type: 'session', session_id: 'session' });
+			return;
+		case 'camera/webrtc/candidate':
+			reply(null);
+			return;
 		case 'weather/subscribe_forecast':
 			reply(null);
 			event({ forecast: forecast() });
 			return;
+		case 'subscribe_trigger':
+			if (message.trigger?.platform === 'event' && message.trigger?.event_type === 'HEARTH') {
+				if (!triggerSubscribers.has(socket)) triggerSubscribers.set(socket, new Set());
+				triggerSubscribers.get(socket).add(message.id);
+			}
+			reply(null);
+			return;
 		default:
-			// subscribe_events, subscribe_trigger and anything else the dashboard
-			// opens are accepted and never fire
+			// subscribe_events and anything else the dashboard opens are
+			// accepted and never fire
 			reply(null);
 	}
 }
@@ -696,9 +751,15 @@ const http = createServer(async (request, response) => {
 		response.end(JSON.stringify(calls));
 		return;
 	}
+	if (request.url === '/_test/camera') {
+		response.setHeader('Content-Type', 'application/json');
+		response.end(JSON.stringify(cameraRequests));
+		return;
+	}
 	if (request.url === '/_test/reset' && request.method === 'POST') {
 		states = initialStates();
 		calls = [];
+		cameraRequests = [];
 		for (const entityId of Object.keys(states)) pushChange(entityId);
 		response.end('ok');
 		return;
@@ -724,9 +785,49 @@ const http = createServer(async (request, response) => {
 		response.end('ok');
 		return;
 	}
+	if (request.url === '/_test/fire_event' && request.method === 'POST') {
+		let data;
+		try {
+			data = JSON.parse((await readBody(request)) || '{}');
+		} catch {
+			response.statusCode = 400;
+			response.end('invalid JSON');
+			return;
+		}
+		fireHearthEvent(data);
+		response.end('ok');
+		return;
+	}
 	response.statusCode = 404;
 	response.end();
 });
+
+// the shape Home Assistant sends for a subscribe_trigger event trigger
+function fireHearthEvent(data) {
+	const context = { id: 'ctx', parent_id: null, user_id: null };
+	const trigger = {
+		id: '0',
+		idx: '0',
+		alias: null,
+		platform: 'event',
+		event: {
+			event_type: 'HEARTH',
+			data,
+			origin: 'LOCAL',
+			time_fired: new Date().toISOString(),
+			context
+		},
+		description: 'event HEARTH'
+	};
+	for (const [socket, ids] of triggerSubscribers) {
+		if (socket.readyState !== socket.OPEN) continue;
+		for (const id of ids) {
+			socket.send(
+				JSON.stringify({ id, type: 'event', event: { variables: { trigger }, context } })
+			);
+		}
+	}
+}
 
 const wss = new WebSocketServer({ server: http, path: '/api/websocket' });
 
@@ -745,7 +846,10 @@ wss.on('connection', (socket) => {
 		}
 		handleMessage(socket, message);
 	});
-	socket.on('close', () => entitySubscribers.delete(socket));
+	socket.on('close', () => {
+		entitySubscribers.delete(socket);
+		triggerSubscribers.delete(socket);
+	});
 });
 
 http.listen(PORT, '127.0.0.1', () => {

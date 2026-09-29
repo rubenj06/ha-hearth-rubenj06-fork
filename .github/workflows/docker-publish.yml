@@ -6,6 +6,8 @@ env:
 
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
   release:
     types: [published]
 
@@ -38,10 +40,14 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # release tags produce <version> + latest, manual runs from a branch produce <branch>
+          # stable releases produce <version> + latest, prereleases produce
+          # <version> + beta, pushes to master produce edge and manual runs
+          # from a branch produce <branch>
           tags: |
             type=semver,pattern={{version}}
-            type=ref,event=branch
+            type=raw,value=beta,enable=${{ github.event.release.prerelease == true }}
+            type=edge,branch=master
+            type=ref,event=branch,enable=${{ github.event_name == 'workflow_dispatch' }}
           flavor: |
             latest=auto
 

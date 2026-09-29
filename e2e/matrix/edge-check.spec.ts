@@ -50,10 +50,10 @@ test('the setting removes the bands entirely', async ({ page }) => {
 
 	await page.getByRole('button', { name: 'Edit Hearth configuration' }).click();
 	await page.getByRole('button', { name: 'Settings' }).first().click();
-	const toggle = page.getByRole('button', { name: 'Scroll edge blur' });
-	await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+	const toggle = page.getByRole('switch', { name: 'Scroll edge blur' });
+	await expect(toggle).toBeChecked();
 	await toggle.click();
-	await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+	await expect(toggle).not.toBeChecked();
 
 	await expect(page.locator('.main-wrap > div[aria-hidden="true"]')).toHaveCount(0);
 	await page.screenshot({ path: `${OUT}/03-setting-off.png` });

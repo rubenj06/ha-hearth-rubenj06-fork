@@ -6,6 +6,7 @@ import { conditionalMediaCard } from './cards/conditional_media';
 import { daysSinceCard } from './cards/days_since';
 import { entitiesCard } from './cards/entities';
 import { headerCard } from './cards/header';
+import { iframeCard } from './cards/iframe';
 import { imageCard } from './cards/image';
 import { mediaCard } from './cards/media';
 import { scenesCard } from './cards/scenes';
@@ -18,6 +19,7 @@ export const CARD_DEFINITIONS = [
 	daysSinceCard,
 	entitiesCard,
 	headerCard,
+	iframeCard,
 	imageCard,
 	mediaCard,
 	scenesCard,

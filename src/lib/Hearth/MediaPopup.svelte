@@ -724,8 +724,10 @@
 		cursor: pointer;
 	}
 
-	.row:hover {
-		background: var(--h-on-art-fill);
+	@media (hover: hover) {
+		.row:hover {
+			background: var(--h-on-art-fill);
+		}
 	}
 
 	.row-art {
@@ -886,16 +888,60 @@
 		top: 12px;
 		right: 14px;
 	}
+	/* an 18px bar is a hard target for a finger; the hit area grows, the bar does not */
+	@media (pointer: coarse) {
+		.progress::before,
+		.volume-bar::before {
+			content: '';
+			position: absolute;
+			inset: -13px 0; /* literal ok: 18px bar plus 13px each side is a 44px target */
+		}
+	}
+
 	/* see breakpoints.ts */
 	@media (max-width: 900px) {
 		.sheet {
-			/* the margins keep a landscape cutout off the art and the controls */
-			width: calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right));
-			margin-left: env(safe-area-inset-left);
-			margin-right: env(safe-area-inset-right);
+			/* the overlay's own padding already keeps a landscape cutout off the art */
+			width: 100%;
 			height: min(560px, calc(100dvh - 24px));
 			border-radius: var(--h-radius-xl) var(--h-radius-xl) 0 0;
 			align-self: flex-end;
+		}
+
+		.scrim {
+			background: linear-gradient(180deg, var(--h-art-scrim-1) 0%, var(--h-art-scrim-3) 60%);
+		}
+
+		/* no room for the panel beside the stage: it stacks under it and the
+		   sheet scrolls when the two do not fit */
+		.content {
+			flex-direction: column;
+			gap: 18px;
+			padding: 22px 20px calc(20px + env(safe-area-inset-bottom));
+			overflow-y: auto;
+			overscroll-behavior: contain;
+		}
+
+		.stage {
+			flex: none;
+		}
+
+		/* clear of the close button pinned over the top right corner */
+		.source-row {
+			padding-right: 40px;
+			min-height: 44px;
+		}
+
+		.track {
+			margin-top: 16px;
+		}
+
+		.transport {
+			gap: 20px;
+		}
+
+		.panel {
+			width: auto;
 		}
 	}
 </style>

@@ -307,8 +307,10 @@
 		cursor: pointer;
 	}
 
-	.expand:hover {
-		color: var(--h-text-3);
+	@media (hover: hover) {
+		.expand:hover {
+			color: var(--h-text-3);
+		}
 	}
 
 	.picker {
@@ -356,9 +358,11 @@
 		overflow: hidden;
 	}
 
-	.cell:hover {
-		background: rgb(var(--h-surface-rgb) / calc(0.08 * var(--h-fill-scale)));
-		color: var(--h-text-2);
+	@media (hover: hover) {
+		.cell:hover {
+			background: rgb(var(--h-surface-rgb) / calc(0.08 * var(--h-fill-scale)));
+			color: var(--h-text-2);
+		}
 	}
 
 	.cell.selected {
@@ -388,8 +392,10 @@
 		cursor: pointer;
 	}
 
-	.more:hover {
-		background: rgb(var(--h-surface-rgb) / calc(0.08 * var(--h-fill-scale)));
-		color: var(--h-text-2);
+	@media (hover: hover) {
+		.more:hover {
+			background: rgb(var(--h-surface-rgb) / calc(0.08 * var(--h-fill-scale)));
+			color: var(--h-text-2);
+		}
 	}
 </style>

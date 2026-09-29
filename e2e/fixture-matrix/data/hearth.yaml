@@ -201,6 +201,11 @@ rooms:
           type: image
           entity: image.floorplan
           title: Floor plan
+        - id: iframe-card
+          type: iframe
+          title: Web page
+          url: about:blank
+          height: 160
   - id: devices
     name: Devices
     icon: devices

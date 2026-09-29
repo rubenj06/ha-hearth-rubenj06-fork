@@ -112,7 +112,7 @@
 
 	/* phones (the rail's own fold): rooms become a horizontal chip row
 	   instead of a tall list, which only shows while editing since the rail
-	   hides runtime navigation behind PhoneNav there */
+	   hides runtime navigation behind PhoneNav there (see breakpoints.ts) */
 	@media (max-width: 900px) {
 		.room-list {
 			display: flex;

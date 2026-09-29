@@ -10,13 +10,15 @@
 	/**
 	 * Page switcher for narrow viewports, where the rail folds under the page
 	 * and its navigation widget would be a screen away. Sticky at the top of
-	 * the scroll container; hidden by CSS above the rail-folds breakpoint.
+	 * the scroll container; hidden by CSS above the rail-folds breakpoint
+	 * unless `always`, which a dashboard with no rail at all passes.
 	 */
-	let { onsearch }: { onsearch: () => void } = $props();
+	let { onsearch, always = false }: { onsearch: () => void; always?: boolean } = $props();
 
 	// the rail's own search widget is hidden here, so this button stands in for
-	// it - unless that widget is hidden on mobile or by its visibility conditions
-	let hasSearch = $derived(searchAvailable($hearthConfig.rail, $states, true));
+	// it - unless that widget is hidden on mobile or by its visibility conditions.
+	// With no rail nothing folds, so hidden on mobile does not count.
+	let hasSearch = $derived(searchAvailable($hearthConfig.rail, $states, !always));
 
 	// a page picked from search or a ?room= link can sit past the strip's edge
 	let pills: Record<string, HTMLButtonElement | undefined> = {};
@@ -29,7 +31,7 @@
 	});
 </script>
 
-<nav class="phone-nav" aria-label={$lang('hearth_pages')}>
+<nav class="phone-nav" class:always aria-label={$lang('hearth_pages')}>
 	<div class="pages">
 		{#each $hearthConfig.rooms as room (room.id)}
 			<button
@@ -57,6 +59,15 @@
 		display: none;
 	}
 
+	/* above the fold there is no scroller to stick in or screen edge to bleed
+	   to: the strip is just the first row over the page */
+	.phone-nav.always {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+
 	/* see breakpoints.ts */
 	@media (max-width: 900px) {
 		.phone-nav {
@@ -80,52 +91,52 @@
 			   the pills, which reads as a smudge */
 			background: var(--h-bg-1);
 		}
+	}
 
-		.pages {
-			display: flex;
-			gap: 8px;
-			overflow-x: auto;
-			scrollbar-width: none;
-			flex: 1;
-			min-width: 0;
-			padding: 2px;
-		}
+	.pages {
+		display: flex;
+		gap: 8px;
+		overflow-x: auto;
+		scrollbar-width: none;
+		flex: 1;
+		min-width: 0;
+		padding: 2px;
+	}
 
-		.pages::-webkit-scrollbar {
-			display: none;
-		}
+	.pages::-webkit-scrollbar {
+		display: none;
+	}
 
-		.page,
-		.search {
-			flex: none;
-			position: relative;
-			display: flex;
-			align-items: center;
-			gap: 8px;
-			min-height: 44px;
-			padding: 0 14px;
-			border: 1px solid rgb(var(--h-line-rgb) / calc(0.1 * var(--h-line-scale)));
-			border-radius: var(--h-radius-pill);
-			background: rgb(var(--h-surface-rgb) / calc(0.05 * var(--h-fill-scale)));
-			backdrop-filter: var(--h-surface-blur);
-			color: var(--h-text-3);
-			font: inherit;
-			font-size: var(--h-type-body);
-			white-space: nowrap;
-			cursor: pointer;
-		}
+	.page,
+	.search {
+		flex: none;
+		position: relative;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-height: 44px;
+		padding: 0 14px;
+		border: 1px solid rgb(var(--h-line-rgb) / calc(0.1 * var(--h-line-scale)));
+		border-radius: var(--h-radius-pill);
+		background: rgb(var(--h-surface-rgb) / calc(0.05 * var(--h-fill-scale)));
+		backdrop-filter: var(--h-surface-blur);
+		color: var(--h-text-3);
+		font: inherit;
+		font-size: var(--h-type-body);
+		white-space: nowrap;
+		cursor: pointer;
+	}
 
-		.search {
-			width: 44px;
-			padding: 0;
-			justify-content: center;
-		}
+	.search {
+		width: 44px;
+		padding: 0;
+		justify-content: center;
+	}
 
-		.page.active {
-			background: rgb(var(--h-accent-rgb) / calc(0.16 * var(--h-accent-scale)));
-			border-color: rgb(var(--h-accent-rgb) / calc(0.4 * var(--h-accent-scale)));
-			color: var(--h-accent-text);
-		}
+	.page.active {
+		background: rgb(var(--h-accent-rgb) / calc(0.16 * var(--h-accent-scale)));
+		border-color: rgb(var(--h-accent-rgb) / calc(0.4 * var(--h-accent-scale)));
+		color: var(--h-accent-text);
 	}
 
 	/*

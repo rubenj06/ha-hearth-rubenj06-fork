@@ -2,13 +2,8 @@
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { configuration } from '$lib/core/app/configuration';
-	import {
-		hapticCapabilities,
-		haptics,
-		hapticsSupported,
-		sampleVibration,
-		vibrate
-	} from '$lib/core/app/haptics';
+	import { deviceName, saveDeviceName } from '$lib/core/app/device';
+	import { haptics, hapticsSupported, sampleVibration, vibrate } from '$lib/core/app/haptics';
 	import { motion } from '$lib/core/app/motion';
 	import { MOTION } from '$lib/core/theme';
 	import { lang, selectedLanguage, translation } from '$lib/core/i18n';
@@ -23,9 +18,11 @@
 	let reduceMotion = $state($motion === 0);
 	let touchFeedback = $state($haptics);
 	let feedbackSupported = $state(true);
-	let feedbackNeedsHttps = $state(false);
 	let token = $state($configuration?.token ?? '');
 	let customJs = $state($configuration?.custom_js ?? false);
+	// may come from a ?device= override, which is not this browser's to keep
+	const shownDevice = $deviceName;
+	let device = $state(shownDevice);
 	let installedVersion = $state<string>();
 	let saveError = $state<string | null>(null);
 	// the revision the server holds after another session saved first
@@ -33,17 +30,11 @@
 	let saving = $state(false);
 
 	function staged() {
-		return { locale, reduceMotion, touchFeedback, token, customJs };
+		return { locale, reduceMotion, touchFeedback, token, customJs, device };
 	}
 
 	let touchFeedbackSub = $derived(
-		$lang(
-			feedbackSupported
-				? 'hearth_touch_feedback_sub'
-				: feedbackNeedsHttps
-					? 'hearth_touch_feedback_needs_https'
-					: 'hearth_touch_feedback_unsupported'
-		)
+		$lang(feedbackSupported ? 'hearth_touch_feedback_sub' : 'hearth_touch_feedback_unsupported')
 	);
 
 	const initial = JSON.stringify(staged());
@@ -51,7 +42,6 @@
 
 	onMount(async () => {
 		feedbackSupported = hapticsSupported();
-		feedbackNeedsHttps = !feedbackSupported && !hapticCapabilities().secureContext;
 		try {
 			const [languageResponse, versionResponse] = await Promise.all([
 				fetch(`${base}/_api/list_languages`),
@@ -130,6 +120,7 @@
 			$selectedLanguage = locale;
 			$motion = reduceMotion ? 0 : MOTION.base;
 			$haptics = touchFeedback;
+			if (device !== shownDevice) saveDeviceName(device);
 			vibrate('success');
 			document.documentElement.lang = locale || 'en';
 
@@ -220,6 +211,17 @@
 					spellcheck="false"
 					onfocus={handleKeyFocus}
 					onblur={handleKeyFocus}
+				/>
+			</SettingsRow>
+			<SettingsRow label={$lang('hearth_device_name')} sub={$lang('hearth_device_name_sub')}>
+				<input
+					class="inline-text"
+					type="text"
+					aria-label={$lang('hearth_device_name')}
+					bind:value={device}
+					placeholder="kitchen"
+					autocomplete="off"
+					spellcheck="false"
 				/>
 			</SettingsRow>
 			<SettingsRow label={$lang('hearth_custom_js')} sub={$lang('hearth_custom_js_sub')}>

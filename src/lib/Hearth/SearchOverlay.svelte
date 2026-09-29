@@ -235,6 +235,13 @@
 		color: var(--h-text-6);
 	}
 
+	/* iOS Safari zooms the page into any input set under 16px */
+	@media (pointer: coarse) {
+		.search input {
+			font-size: max(16px, var(--h-type-body)); /* literal ok: the iOS no-zoom floor */
+		}
+	}
+
 	.list {
 		flex: 1;
 		overflow-y: auto;
@@ -256,9 +263,14 @@
 		text-align: left;
 	}
 
-	.row:hover,
 	.row.active {
 		background: rgb(var(--h-surface-rgb) / calc(0.06 * var(--h-fill-scale)));
+	}
+
+	@media (hover: hover) {
+		.row:hover {
+			background: rgb(var(--h-surface-rgb) / calc(0.06 * var(--h-fill-scale)));
+		}
 	}
 
 	.row-icon {
@@ -313,7 +325,9 @@
 		.panel {
 			width: 100%;
 			max-width: none;
-			max-height: 100dvh;
+			/* the overlay's box, not the viewport's: an on-screen keyboard that
+			   shrinks the page shrinks the overlay, and the results with it */
+			max-height: 100%;
 			border-top: 0;
 			border-radius: 0 0 var(--h-radius-xl) var(--h-radius-xl);
 			padding-top: calc(16px + env(safe-area-inset-top));

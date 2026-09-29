@@ -284,8 +284,13 @@
 		flex: none;
 	}
 
+	/* the actions beside it must stay on screen however long the name is */
 	.title {
 		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
 		font-size: var(--h-type-headline);
 		font-weight: 600;
 		letter-spacing: -0.3px;
@@ -316,8 +321,10 @@
 		transform: scale(0.9);
 	}
 
-	.icon-button:hover {
-		color: var(--h-text-3);
+	@media (hover: hover) {
+		.icon-button:hover {
+			color: var(--h-text-3);
+		}
 	}
 
 	.body-wrap {
@@ -436,13 +443,17 @@
 	@media (max-width: 900px) {
 		.overlay {
 			align-items: stretch;
-			/* a landscape cutout overlaps the edge a full-width sheet reaches to */
-			padding: 8px calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
+			/* the insets keep an installed app's status bar, home indicator and a
+			   landscape cutout off the sheet's edges */
+			padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right))
+				calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
 		}
 
+		/* stretched rather than sized from the viewport, so it follows the
+		   overlay when an on-screen keyboard shrinks the page */
 		.sheet {
 			width: 100%;
-			height: calc(100dvh - 16px);
+			height: auto;
 			border-radius: var(--h-radius-md);
 		}
 

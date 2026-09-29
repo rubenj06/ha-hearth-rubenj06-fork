@@ -197,7 +197,7 @@ describe('Ingress authentication', () => {
 
 	it('redirects to HTTPS OAuth and retains the Ingress callback path, ignoring internal cached tokens', async () => {
 		localStorage.hearthTokens = JSON.stringify({
-			hassUrl: 'http://homeassistant:8123',
+			hassUrl: 'http://homeassistant.local:8123',
 			access_token: 'old',
 			expires: Date.now() + 60000
 		});
@@ -257,7 +257,10 @@ describe('Ingress authentication', () => {
 		callback.searchParams.set(
 			'state',
 			btoa(
-				JSON.stringify({ hassUrl: 'http://homeassistant:8123', clientId: callback.origin + '/' })
+				JSON.stringify({
+					hassUrl: 'http://homeassistant.local:8123',
+					clientId: callback.origin + '/'
+				})
 			)
 		);
 		vi.stubGlobal('location', callback);

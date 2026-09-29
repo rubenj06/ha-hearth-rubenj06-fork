@@ -10,6 +10,7 @@
 	import AppSettingsEditSheet from './AppSettingsEditSheet.svelte';
 	import CustomCssEditSheet from './CustomCssEditSheet.svelte';
 	import VersionsEditSheet from './VersionsEditSheet.svelte';
+	import AlertEditSheet from './AlertEditSheet.svelte';
 </script>
 
 {#if $editor}
@@ -27,9 +28,11 @@
 		{:else if $editor.kind === 'stack'}
 			<StackEditSheet roomId={$editor.roomId} column={$editor.column} index={$editor.index} />
 		{:else if $editor.kind === 'railWidget'}
-			<RailWidgetEditSheet index={$editor.index} />
+			<RailWidgetEditSheet index={$editor.index} side={$editor.side} />
 		{:else if $editor.kind === 'settings'}
 			<SettingsEditSheet />
+		{:else if $editor.kind === 'alert'}
+			<AlertEditSheet index={$editor.index} />
 		{:else if $editor.kind === 'appSettings'}
 			<AppSettingsEditSheet />
 		{:else if $editor.kind === 'customCss'}

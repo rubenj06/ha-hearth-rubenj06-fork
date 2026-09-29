@@ -34,4 +34,23 @@ describe('PopupSlider', () => {
 		bar.dispatchEvent(pointer('pointerup', 201));
 		expect(onchange).toHaveBeenLastCalledWith(201, true);
 	});
+
+	it('commits the value at a tapped spot', () => {
+		const onchange = vi.fn();
+		render(PopupSlider, {
+			label: 'Level',
+			icon: 'tune',
+			value: 0,
+			variant: 'amber',
+			updateMode: 'release',
+			onchange
+		});
+		const bar = screen.getByRole('slider');
+		bar.getBoundingClientRect = () => ({ left: 0, width: 200 }) as DOMRect;
+		bar.setPointerCapture = vi.fn();
+		bar.releasePointerCapture = vi.fn();
+		bar.dispatchEvent(pointer('pointerdown', 150));
+		bar.dispatchEvent(pointer('pointerup', 150));
+		expect(onchange).toHaveBeenCalledExactlyOnceWith(75, true);
+	});
 });

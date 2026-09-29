@@ -15,13 +15,16 @@
 		value = $bindable(''),
 		domains = [],
 		hint = undefined,
-		error = undefined
+		error = undefined,
+		onchange = undefined
 	}: {
 		label: string;
 		value?: string;
 		domains?: string[];
 		hint?: string;
 		error?: string | null;
+		/** Fires when a value is committed: typed and left, or picked. */
+		onchange?: (value: string) => void;
 	} = $props();
 
 	let pickerOpen = $state(false);
@@ -43,6 +46,7 @@
 				list="entities-{uid}"
 				placeholder="entity_id"
 				spellcheck="false"
+				onchange={() => onchange?.(value)}
 				aria-invalid={error ? true : undefined}
 				aria-describedby={describedBy(uid, hint, error)}
 			/>
@@ -80,7 +84,10 @@
 {#if pickerOpen}
 	<EntityPicker
 		{domains}
-		onselect={(entityId) => (value = entityId)}
+		onselect={(entityId) => {
+			value = entityId;
+			onchange?.(entityId);
+		}}
 		onclose={() => (pickerOpen = false)}
 	/>
 {/if}
@@ -147,7 +154,9 @@
 		cursor: pointer;
 	}
 
-	.search:hover {
-		color: var(--h-text-3);
+	@media (hover: hover) {
+		.search:hover {
+			color: var(--h-text-3);
+		}
 	}
 </style>

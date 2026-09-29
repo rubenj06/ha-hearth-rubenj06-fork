@@ -4,6 +4,7 @@
 	import type { HeaderCard } from './descriptor';
 	import EntityField from '../../edit/EntityField.svelte';
 	import IconField from '../../edit/IconField.svelte';
+	import ImageField from '../../edit/ImageField.svelte';
 	import TextField from '../../edit/TextField.svelte';
 
 	let { initial: initialProp, onchange }: CardEditorProps<HeaderCard> = $props();
@@ -17,6 +18,7 @@
 	let icon = $state(initial?.icon ?? 'home');
 	let tempEntity = $state(initial?.temp_entity ?? '');
 	let humidityEntity = $state(initial?.humidity_entity ?? '');
+	let backgroundImage = $state(initial?.background_image ?? '');
 
 	$effect(() => {
 		onchange({
@@ -25,7 +27,8 @@
 				subtitle: subtitle.trim() || undefined,
 				icon: icon.trim() || undefined,
 				temp_entity: tempEntity.trim() || undefined,
-				humidity_entity: humidityEntity.trim() || undefined
+				humidity_entity: humidityEntity.trim() || undefined,
+				background_image: backgroundImage.trim() || undefined
 			}
 		});
 	});
@@ -52,3 +55,4 @@
 	bind:value={humidityEntity}
 	domains={['sensor']}
 />
+<ImageField label={$lang('hearth_background_image')} bind:value={backgroundImage} />

@@ -69,6 +69,17 @@ function liveMediaMatch(query: string): boolean {
 }
 
 /**
+ * Evaluates conditions outside a component, for alert rules. Media queries
+ * never hold here: alert rules cannot use them (see model/alerts.ts).
+ */
+export function conditionsHold(
+	conditions: VisibilityCondition[],
+	$states: HassEntities | undefined
+): boolean {
+	return evaluateVisibility(conditions, $states, {});
+}
+
+/**
  * Whether the rail currently shows a widget of `type`: its visibility
  * conditions hold and, while the rail is folded (`narrow`), it is not hidden
  * on mobile. Media conditions are read from the live window unless `match`

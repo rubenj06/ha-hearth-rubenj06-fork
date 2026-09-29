@@ -10,11 +10,13 @@ class TestNode extends EventTarget {
 	}
 }
 
-function pointer(type: string, clientX: number) {
+function pointer(type: string, clientX: number, clientY = 0, pointerId = 1, isPrimary = true) {
 	const event = new Event(type) as PointerEvent;
 	Object.defineProperties(event, {
 		clientX: { value: clientX },
-		pointerId: { value: 1 }
+		clientY: { value: clientY },
+		pointerId: { value: pointerId },
+		isPrimary: { value: isPrimary }
 	});
 	return event;
 }
@@ -76,6 +78,16 @@ describe('horizontalDrag touch feedback', () => {
 		node.dispatchEvent(pointer('pointerup', 24));
 		expect(vibrateSpy).not.toHaveBeenCalled();
 	});
+
+	it('ticks the commit for a tap that sets the value', () => {
+		asPhone();
+		const node = new TestNode();
+		horizontalDrag(node as unknown as HTMLElement, { set: vi.fn(), tapSets: true });
+
+		node.dispatchEvent(pointer('pointerdown', 110));
+		node.dispatchEvent(pointer('pointerup', 110));
+		expect(vibrateSpy).toHaveBeenCalledOnce();
+	});
 });
 
 describe('horizontalDrag', () => {
@@ -136,6 +148,131 @@ describe('horizontalDrag', () => {
 		expect(tap).not.toHaveBeenCalled();
 		expect(node.releasePointerCapture).toHaveBeenCalledWith(1);
 		action?.destroy?.();
+	});
+});
+
+describe('horizontalDrag vertical movement', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('abandons a gesture that goes vertical first, with no tap, hold or value', () => {
+		vi.useFakeTimers();
+		const node = new TestNode();
+		const set = vi.fn();
+		const tap = vi.fn();
+		const hold = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set, tap, hold });
+
+		node.dispatchEvent(pointer('pointerdown', 20, 100));
+		node.dispatchEvent(pointer('pointermove', 22, 130));
+		// sideways movement after the scroll started must not turn into a drag
+		node.dispatchEvent(pointer('pointermove', 150, 160));
+		vi.advanceTimersByTime(600);
+		node.dispatchEvent(pointer('pointerup', 150, 160));
+
+		expect(set).not.toHaveBeenCalled();
+		expect(tap).not.toHaveBeenCalled();
+		expect(hold).not.toHaveBeenCalled();
+		expect(node.releasePointerCapture).toHaveBeenCalledWith(1);
+	});
+
+	it('keeps a horizontal drag going when it later drifts vertically', () => {
+		const node = new TestNode();
+		const set = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set });
+
+		node.dispatchEvent(pointer('pointerdown', 20, 100));
+		node.dispatchEvent(pointer('pointermove', 60, 102));
+		node.dispatchEvent(pointer('pointermove', 110, 160));
+		node.dispatchEvent(pointer('pointerup', 110, 160));
+
+		expect(set).toHaveBeenLastCalledWith(50, true);
+		expect(set).toHaveBeenCalledTimes(3);
+	});
+
+	it('still taps after small vertical drift', () => {
+		const node = new TestNode();
+		const tap = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set: vi.fn(), tap });
+
+		node.dispatchEvent(pointer('pointerdown', 20, 100));
+		node.dispatchEvent(pointer('pointermove', 22, 108));
+		node.dispatchEvent(pointer('pointerup', 22, 108));
+		expect(tap).toHaveBeenCalledOnce();
+	});
+});
+
+describe('horizontalDrag pointer tracking', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('ignores non-primary pointers and a second pointer while one is tracked', () => {
+		const node = new TestNode();
+		const set = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set });
+
+		node.dispatchEvent(pointer('pointerdown', 20, 0, 2, false));
+		node.dispatchEvent(pointer('pointermove', 110, 0, 2, false));
+		expect(set).not.toHaveBeenCalled();
+		expect(node.setPointerCapture).not.toHaveBeenCalled();
+
+		node.dispatchEvent(pointer('pointerdown', 20, 0, 1));
+		node.dispatchEvent(pointer('pointerdown', 150, 0, 3));
+		node.dispatchEvent(pointer('pointermove', 110, 0, 1));
+		node.dispatchEvent(pointer('pointerup', 110, 0, 1));
+		expect(node.setPointerCapture).toHaveBeenCalledOnce();
+		expect(set).toHaveBeenLastCalledWith(50, true);
+	});
+
+	it('fires one hold when the tracked pointer goes down again', () => {
+		vi.useFakeTimers();
+		const node = new TestNode();
+		const hold = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set: vi.fn(), hold });
+
+		node.dispatchEvent(pointer('pointerdown', 20));
+		vi.advanceTimersByTime(300);
+		node.dispatchEvent(pointer('pointerdown', 20));
+		vi.advanceTimersByTime(600);
+		expect(hold).toHaveBeenCalledOnce();
+	});
+});
+
+describe('horizontalDrag tapSets', () => {
+	it('commits the value under a stationary tap', () => {
+		const node = new TestNode();
+		const set = vi.fn();
+		const end = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set, end, tapSets: true });
+
+		node.dispatchEvent(pointer('pointerdown', 60));
+		node.dispatchEvent(pointer('pointerup', 62));
+		expect(set).toHaveBeenCalledExactlyOnceWith(26, true);
+		expect(end).toHaveBeenCalledWith(26);
+	});
+
+	it('ignores a right click', () => {
+		const node = new TestNode();
+		const set = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set, tapSets: true });
+
+		const down = pointer('pointerdown', 60);
+		Object.defineProperty(down, 'button', { value: 2 });
+		node.dispatchEvent(down);
+		node.dispatchEvent(pointer('pointerup', 60));
+		expect(set).not.toHaveBeenCalled();
+	});
+
+	it('leaves a stationary tap alone without the option', () => {
+		const node = new TestNode();
+		const set = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set });
+
+		node.dispatchEvent(pointer('pointerdown', 60));
+		node.dispatchEvent(pointer('pointerup', 60));
+		expect(set).not.toHaveBeenCalled();
 	});
 });
 

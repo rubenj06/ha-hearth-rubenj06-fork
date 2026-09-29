@@ -41,9 +41,10 @@ export const longPress: Action<HTMLElement, LongPressOptions> = (node, options) 
 	let held = false;
 
 	function handleDown(event: PointerEvent) {
-		if (current.disabled) return;
+		if (current.disabled || event.isPrimary === false) return;
 		held = false;
 		start = { x: event.clientX, y: event.clientY };
+		clearTimeout(timer);
 		timer = setTimeout(() => {
 			held = true;
 			vibrate('hold');

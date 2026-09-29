@@ -1,76 +1,51 @@
 <script lang="ts">
 	import EmptyState from '../../EmptyState.svelte';
 	import { ICON } from '../../iconSizes';
-	import { lang } from '$lib/core/i18n';
+	import { fill, lang } from '$lib/core/i18n';
 	import { persistentNotifications } from '$lib/core/ha/connection';
-	import { service } from '$lib/core/ha/commands';
-	import { loadMarkdownRenderer } from '../../markdown';
-	import { hearthEditMode } from '../../store';
+	import { activeAlerts, alertIcon, alertListOpen, hearthEditMode } from '../../store';
 	import type { NotificationsWidget } from './descriptor';
-
-	let { widget }: { widget: NotificationsWidget } = $props();
 	import Icon from '../../Icon.svelte';
 
-	let entries = $derived(Object.entries($persistentNotifications ?? {}));
-	// rendered HTML per notification, keyed by id and remembered with the
-	// message it came from so an updated message under the same id re-renders
-	let rendered = $state<Record<string, { message: string; html: string }>>({});
-	$effect(() => {
-		const pending = entries
-			.map(([id, notification]) => [id, notification.message ?? ''] as const)
-			.filter(([id, message]) => rendered[id]?.message !== message);
-		const stale = Object.keys(rendered).filter((id) => !(id in ($persistentNotifications ?? {})));
-		if (!pending.length && !stale.length) return;
-		let cancelled = false;
-		loadMarkdownRenderer().then((render) => {
-			if (cancelled) return;
-			for (const id of stale) delete rendered[id];
-			for (const [id, message] of pending) rendered[id] = { message, html: render(message) };
-		});
-		return () => {
-			cancelled = true;
-		};
-	});
+	let { widget }: { widget: NotificationsWidget } = $props();
 
-	function dismiss(id: string) {
-		service('persistent_notification', 'dismiss', { notification_id: id });
-	}
+	let notifications = $derived(Object.values($persistentNotifications ?? {}));
+	let count = $derived($activeAlerts.length + notifications.length);
+	// the newest alert leads; a Home Assistant notification only when there is none
+	let lead = $derived(
+		$activeAlerts[0] ?? (notifications[0] && { ...notifications[0], severity: 'info' as const })
+	);
 </script>
 
 <!-- nothing to show hides the widget; the editor keeps it findable, dimmed -->
-{#if entries.length || $hearthEditMode}
-	<div class="notifications" class:inactive={!entries.length} data-widget={widget.id}>
-		{#each entries as [id, notification] (id)}
-			<div class="item">
-				<div class="body">
-					{#if notification.title}<div class="title">{notification.title}</div>{/if}
-					{#if rendered[id]?.message === (notification.message ?? '')}
-						<!-- eslint-disable-next-line svelte/no-at-html-tags -- sanitized in markdown.ts -->
-						<div class="message">{@html rendered[id].html}</div>
-					{:else}
-						<div class="message">{notification.message ?? ''}</div>
-					{/if}
-				</div>
-				<button
-					type="button"
-					class="dismiss"
-					aria-label={$lang('hearth_dismiss')}
-					onclick={() => dismiss(id)}
-				>
-					<Icon name="close" size={ICON.inline} />
-				</button>
-			</div>
+{#if count || $hearthEditMode}
+	<div class="notifications" class:inactive={!count} data-widget={widget.id}>
+		{#if lead}
+			<button
+				type="button"
+				class="summary {lead.severity}"
+				aria-label={fill($lang('hearth_notifications_count'), { count })}
+				onclick={() => !$hearthEditMode && alertListOpen.set(true)}
+			>
+				<span class="glyph">
+					<Icon
+						name={$activeAlerts.length ? alertIcon(lead) : 'notifications'}
+						size={ICON.control}
+						color="var(--alert-text)"
+					/>
+					<span class="badge">{count}</span>
+				</span>
+				<span class="lead">{lead.title || $lang('notifications')}</span>
+				<Icon name="chevron_right" size={ICON.control} />
+			</button>
 		{:else}
 			<EmptyState inline text={$lang('hearth_no_notifications')} />
-		{/each}
+		{/if}
 	</div>
 {/if}
 
 <style>
 	.notifications {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
 		padding: 6px 0;
 	}
 
@@ -78,46 +53,60 @@
 		opacity: 0.45;
 	}
 
-	.item {
+	.summary {
+		--alert-text: var(--h-icon);
 		display: flex;
-		gap: 8px;
+		align-items: center;
+		gap: 12px;
+		width: 100%;
+		min-height: 44px;
 		padding: 10px 12px;
+		border: 0;
 		border-radius: var(--h-radius-sm);
 		background: rgb(var(--h-surface-rgb) / calc(0.05 * var(--h-fill-scale)));
 		backdrop-filter: var(--h-surface-blur);
+		color: var(--h-text-5);
+		font: inherit;
+		text-align: start;
+		cursor: pointer;
 	}
 
-	.body {
+	.warning {
+		--alert-text: var(--h-accent-text);
+	}
+
+	.critical {
+		--alert-text: var(--h-bad-text);
+	}
+
+	.glyph {
+		position: relative;
+		display: grid;
+	}
+
+	.badge {
+		position: absolute;
+		top: -6px;
+		right: -8px;
+		min-width: 16px;
+		padding: 0 4px;
+		border-radius: var(--h-radius-hair);
+		background: rgb(var(--h-accent-rgb) / calc(0.9 * var(--h-accent-scale)));
+		color: var(--h-on-accent);
+		font-size: var(--h-type-label);
+		font-weight: 700;
+		line-height: 16px;
+		text-align: center;
+	}
+
+	.lead {
 		flex: 1;
 		min-width: 0;
 		font-size: var(--h-type-secondary);
-		color: var(--h-text-3);
-		overflow-wrap: anywhere;
-	}
-
-	.title {
 		font-weight: 600;
 		color: var(--h-text-1);
-		margin-bottom: 2px;
-	}
-
-	.message :global(p) {
-		margin: 0;
-	}
-
-	.dismiss {
-		flex: none;
-		width: 44px;
-		height: 44px;
-		/* the glyph stays small; the negative margins keep the row as tight as
-		   before while the tap target grows to 44px */
-		margin: -8px -8px -8px 0;
-		border: 0;
-		border-radius: 50%;
-		background: none;
-		color: var(--h-text-5);
-		cursor: pointer;
-		display: grid;
-		place-items: center;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 </style>

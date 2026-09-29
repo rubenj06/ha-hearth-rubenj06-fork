@@ -124,6 +124,12 @@ type RailWidgetVariant =
 /** Where a widget goes once the rail folds under the page. */
 export type MobileSlot = 'top' | 'bottom' | 'hidden';
 
+/** Where the rail sits beside the page on a wide screen, if anywhere. */
+export type RailPosition = 'left' | 'right' | 'both' | 'none';
+
+/** Which of the two rails a widget belongs to when there are two. */
+export type RailSide = 'left' | 'right';
+
 export type RailWidget = RailWidgetVariant & {
 	/*
 	 * Unset takes the slot from the rail's own shape: everything before the
@@ -133,6 +139,8 @@ export type RailWidget = RailWidgetVariant & {
 	mobile?: MobileSlot;
 	/** Superseded by `mobile: 'hidden'`, still read from configs that set it. */
 	hide_mobile?: boolean;
+	/** Only read while `rail_position` is `both`; unset is the left rail. */
+	side?: RailSide;
 	visibility?: VisibilityCondition[];
 };
 
@@ -146,6 +154,8 @@ type OverviewCardVariant =
 			icon?: string;
 			temp_entity?: string;
 			humidity_entity?: string;
+			/** A URL, or `hearth-images/<file>` for an uploaded image. */
+			background_image?: string;
 	  }
 	// height fixes the card in px; without it the card fills its column
 	| {
@@ -226,6 +236,7 @@ type OverviewCardVariant =
 	| { id: string; type: 'climate'; entity?: string; title?: string }
 	// `bar` renders the persistent scene row: equal-width tiles, active one lit
 	| { id: string; type: 'scenes'; title?: string; style?: 'chips' | 'bar'; scenes: SceneRef[] }
+	| { id: string; type: 'iframe'; url?: string; title?: string; height?: number }
 	// days since an input_datetime was last reset, with a one-tap reset
 	| { id: string; type: 'days_since'; entity?: string; title?: string; icon?: string }
 	// the media card for whichever listed player is active; a paused player
@@ -267,11 +278,53 @@ export interface OverviewStack {
 /** Anything that can occupy a top-level slot in an overview column. */
 export type OverviewItem = OverviewCard | OverviewStack;
 
+export type AlertSeverity = 'info' | 'warning' | 'critical';
+
+/**
+ * An alert raised from entity states: it fires once every condition has held
+ * for for_seconds and clears when they stop holding. Home Assistant can raise
+ * alerts too, through the HEARTH event; those are not configured here.
+ */
+export interface AlertRule {
+	id: string;
+	title: string;
+	message?: string;
+	icon?: string;
+	severity: AlertSeverity;
+	conditions: VisibilityCondition[];
+	for_seconds?: number;
+	// unset means true: the alert pops up over the dashboard, not only in the
+	// notifications widget
+	popup?: boolean;
+	// unset means true: the alert and its popup go away once the conditions
+	// stop holding; false keeps it until someone dismisses it
+	auto_close?: boolean;
+	// pops up this entity's detail popup instead of an alert card
+	entity?: string;
+}
+
+export type ScreensaverBackground = 'none' | 'image' | 'radar';
+export type ScreensaverClockSize = 'small' | 'medium' | 'large';
+
+/** The radar map's view; the location falls back to the Home Assistant home. */
+export interface ScreensaverRadar {
+	latitude?: number;
+	longitude?: number;
+	zoom?: number;
+	basemap?: 'dark' | 'light';
+	/** Leaflet tile URL template replacing the OpenStreetMap basemap. */
+	tile_url?: string;
+	/** Plain-text credit for tile_url's provider. */
+	attribution?: string;
+}
+
 export interface HearthConfig {
 	theme?: HearthTheme;
 	// full replacement for theme while day_night resolves to night
 	theme_night?: HearthTheme;
 	day_night?: DayNightSwitch;
+	// unset is a single rail on the left
+	rail_position?: RailPosition;
 	rail: RailWidget[];
 	// every page, Home included; the first one is where the dashboard opens
 	rooms: HearthRoom[];
@@ -280,11 +333,25 @@ export interface HearthConfig {
 	screensaver_drift?: boolean;
 	/** Clock brightness from 10 to 100 percent. */
 	screensaver_brightness?: number;
+	// what fills the screen behind the clock; plain black when unset
+	screensaver_background?: ScreensaverBackground;
+	/** A URL or `hearth-images/<file>`, shown when the background is `image`. */
+	screensaver_image?: string;
+	screensaver_radar?: ScreensaverRadar;
+	screensaver_show_date?: boolean;
+	screensaver_clock_size?: ScreensaverClockSize;
+	/** Weather entity whose condition and temperature show under the clock. */
+	screensaver_weather_entity?: string;
 	keep_screen_on?: boolean;
 	// progressive blur where a scroll container cuts content off; costs a
 	// backdrop pass per layer, so weak tablets can turn it off
 	scroll_edge_blur?: boolean;
+	// a sideways swipe over the page moves to the next or previous page,
+	// set apart for the folded (phone) and wide layouts
+	swipe_navigation_mobile?: boolean;
+	swipe_navigation_desktop?: boolean;
 	// extra edge padding in px, for kiosks whose frame covers screen edges
 	padding_x?: number;
 	padding_y?: number;
+	alerts?: AlertRule[];
 }

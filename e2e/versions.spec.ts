@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
 /*
@@ -15,6 +15,10 @@ test.beforeEach(async ({ page }) => {
 
 /** The document the fixture server saves to, watched for writes a test forbids. */
 const CONFIG_FILE = 'e2e/fixture/data/hearth.yaml';
+const CONFIG_FIXTURE = readFileSync(CONFIG_FILE, 'utf8');
+
+// saves and restores rewrite the shared fixture, which later specs read
+test.afterEach(() => writeFileSync(CONFIG_FILE, CONFIG_FIXTURE));
 
 async function openYamlEditor(page: import('@playwright/test').Page) {
 	await page.getByRole('button', { name: 'Settings', exact: true }).click();

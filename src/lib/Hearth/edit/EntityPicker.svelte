@@ -163,6 +163,13 @@
 		color: var(--h-text-6);
 	}
 
+	/* iOS Safari zooms the page into any input set under 16px */
+	@media (pointer: coarse) {
+		.search input {
+			font-size: max(16px, var(--h-type-body)); /* literal ok: the iOS no-zoom floor */
+		}
+	}
+
 	.list {
 		flex: 1;
 		overflow-y: auto;
@@ -180,8 +187,10 @@
 		cursor: pointer;
 	}
 
-	.row:hover {
-		background: rgb(var(--h-surface-rgb) / calc(0.06 * var(--h-fill-scale)));
+	@media (hover: hover) {
+		.row:hover {
+			background: rgb(var(--h-surface-rgb) / calc(0.06 * var(--h-fill-scale)));
+		}
 	}
 
 	.row-icon {
@@ -234,13 +243,17 @@
 	@media (max-width: 900px) {
 		.overlay {
 			align-items: stretch;
-			/* a landscape cutout overlaps the edge a full-width panel reaches to */
-			padding: 8px calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
+			/* the insets keep an installed app's status bar, home indicator and a
+			   landscape cutout off the panel's edges */
+			padding: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right))
+				calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
 		}
 
+		/* stretched rather than sized from the viewport, so it follows the
+		   overlay when an on-screen keyboard shrinks the page */
 		.panel {
 			width: 100%;
-			height: calc(100dvh - 16px);
+			height: auto;
 			padding: 16px;
 			border-radius: var(--h-radius-md);
 		}

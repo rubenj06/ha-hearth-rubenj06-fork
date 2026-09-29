@@ -3,7 +3,12 @@ import { base } from '$app/paths';
 import { validTimeZone } from './clock';
 import type { SliderUpdateMode } from '$lib/core/app/configuration';
 import { vibrate } from '$lib/core/app/haptics';
-import { DEFAULT_HEARTH_CONFIG, type HearthConfig } from './config';
+import {
+	DEFAULT_HEARTH_CONFIG,
+	type AlertSeverity,
+	type HearthConfig,
+	type RailSide
+} from './config';
 
 /* configuration */
 
@@ -27,6 +32,9 @@ export const hearthNeedsSetup = writable(false);
 export const configurationLoadError = writable<string | null>(null);
 
 export const setupWizardOpen = writable(false);
+
+// shows the sleep screen at once, even with the idle timeout off
+export const screensaverPreview = writable(false);
 
 // server-managed save counter for conflict detection between tabs
 export const hearthRevision = writable(0);
@@ -83,9 +91,12 @@ export type Editor =
 	| { kind: 'card'; roomId: string; id: string | null; column?: number; stackId?: string }
 	// a null index is a new stack, appended to the column on Done
 	| { kind: 'stack'; roomId: string; column: number; index: number | null }
-	| { kind: 'railWidget'; index: number | null }
+	// side is the rail a new widget was added from, while there are two
+	| { kind: 'railWidget'; index: number | null; side?: RailSide }
 	| { kind: 'theme' }
 	| { kind: 'settings' }
+	// a null index is a new alert rule, appended on Done
+	| { kind: 'alert'; index: number | null }
 	| { kind: 'appSettings' }
 	| { kind: 'customCss' }
 	// `from` is the sheet a back arrow returns to, in the state it was left in.
@@ -269,4 +280,52 @@ export function confirmRequestedAction() {
 
 export function closePopup() {
 	popup.set(null);
+}
+
+/*
+ * Bumped when something that needs to be seen appears on its own, such as an
+ * alert; the screensaver steps aside for it. A counter, so every request
+ * reaches subscribers even when two arrive back to back.
+ */
+export const wakeScreen = writable(0);
+
+export function requestWake() {
+	wakeScreen.update((count) => count + 1);
+}
+
+/* alerts */
+
+/*
+ * What the dashboard shows of its alerts. The engine that raises and clears
+ * them (alertEngine.ts) loads after the dashboard mounts; the rail only needs
+ * these stores to draw its count.
+ */
+
+export interface HearthAlert {
+	/** `rule:<id>` for a configured rule, `event:<tag>` for a Home Assistant event. */
+	key: string;
+	title: string;
+	message?: string;
+	icon?: string;
+	severity: AlertSeverity;
+	/** Shown as a card over the dashboard, not only in the list. */
+	popup: boolean;
+	/** An entity the alert is about; the card offers to open it. */
+	entity?: string;
+	since: number;
+}
+
+/** Raised alerts nobody has dismissed on this screen, newest first. */
+export const activeAlerts = writable<HearthAlert[]>([]);
+
+export const alertListOpen = writable(false);
+
+const SEVERITY_ICONS: Record<AlertSeverity, string> = {
+	info: 'info',
+	warning: 'warning',
+	critical: 'error'
+};
+
+export function alertIcon(alert: Pick<HearthAlert, 'icon' | 'severity'>): string {
+	return alert.icon || SEVERITY_ICONS[alert.severity];
 }

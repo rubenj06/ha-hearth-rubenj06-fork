@@ -66,16 +66,10 @@ export interface HapticCapabilities {
 	vibration: boolean;
 	/** iOS Safari, where the Taptic Engine is reached through a switch instead. */
 	taptic: boolean;
-	/**
-	 * Whether the page is a secure context. On an insecure origin Chrome keeps
-	 * `navigator.vibrate` callable and returns true from it, then vibrates
-	 * nothing - so this separates "cannot" from "not on this URL".
-	 */
-	secureContext: boolean;
 }
 
 export function hapticCapabilities(): HapticCapabilities {
-	return { vibration: hasVibrationMotor(), taptic: isIOS(), secureContext: isSecureOrigin() };
+	return { vibration: hasVibrationMotor(), taptic: isIOS() };
 }
 
 /** Whether this device can produce feedback at all. */

@@ -37,8 +37,10 @@
 		-webkit-user-select: none;
 	}
 
-	.add:hover {
-		color: var(--h-text-4);
-		border-color: rgb(var(--h-line-rgb) / calc(0.25 * var(--h-line-scale)));
+	@media (hover: hover) {
+		.add:hover {
+			color: var(--h-text-4);
+			border-color: rgb(var(--h-line-rgb) / calc(0.25 * var(--h-line-scale)));
+		}
 	}
 </style>

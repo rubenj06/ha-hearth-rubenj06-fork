@@ -9,15 +9,26 @@
 		hearthEditMode,
 		hearthLoadError,
 		hearthNeedsSetup,
+		screensaverPreview,
 		setupWizardOpen
 	} from './store';
-	import { foldedTopCount } from './config';
-	import { mediaQueriesIn, railWidgetShown } from './visibility';
+	import {
+		foldedRail,
+		foldedTopCount,
+		railPositionOf,
+		railSides,
+		type RailPosition,
+		type RailSide
+	} from './config';
+	import { conditionsHold, mediaQueriesIn, railWidgetShown } from './visibility';
+	import type { AlertHost } from './alertEngine';
+	import { openEntityDetail } from './details';
+	import { loadMarkdownRenderer } from './markdown';
+	import { layer } from '$lib/ui/layers';
 	import ControlPopup from './ControlPopup.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import Rail from './Rail.svelte';
 	import RoomDetail from './RoomDetail.svelte';
-	import Screensaver from './Screensaver.svelte';
 	import SearchOverlay from './SearchOverlay.svelte';
 	import SetupWizard from './SetupWizard.svelte';
 	import ConfirmDialog from './shell/ConfirmDialog.svelte';
@@ -33,8 +44,19 @@
 	import { scrollEdges, type ScrollEdges } from '$lib/ui/actions/scrollEdges';
 	import { mediaQuery } from '$lib/ui/mediaQuery';
 	import { FOLD_QUERY, SHORT_QUERY } from './breakpoints';
+	import { layerDepth } from '$lib/ui/layers';
+	import { neighborRoom, swipeNav, type SwipeDirection } from './swipeNav';
 
 	let showSearch = $state(false);
+
+	// a preview that cannot load must not stay pending, or the next one is a no-op
+	function loadScreensaver() {
+		return import('./Screensaver.svelte').catch((error) => {
+			console.warn('screensaver unavailable', error);
+			screensaverPreview.set(false);
+			throw error;
+		});
+	}
 
 	// search belongs to the running dashboard; every way of asking for it
 	// (rail widget, page switcher, f key) goes through here
@@ -50,9 +72,23 @@
 	// a phone held sideways has no height to spend before the page, so nothing
 	// rides above it there unless a widget asked for that slot by name
 	const shortScreen = mediaQuery(SHORT_QUERY);
+	let railPosition = $derived(railPositionOf($hearthConfig));
 	let leadingWidgets = $derived(
-		foldedTopCount($hearthConfig.rail, { editing: $hearthEditMode, compact: $shortScreen })
+		foldedTopCount(foldedRail($hearthConfig.rail, railPosition), {
+			editing: $hearthEditMode,
+			compact: $shortScreen,
+			position: railPosition
+		})
 	);
+
+	// outside the editor, an empty one of two rails gives its column back to
+	// the page; the editor keeps it as somewhere to drag widgets into
+	let wideLayout = $derived.by((): RailPosition => {
+		if (railPosition !== 'both' || $hearthEditMode) return railPosition;
+		const { left, right } = railSides($hearthConfig.rail, 'both');
+		if (!right.length) return 'left';
+		return left.length ? 'both' : 'right';
+	});
 
 	// the columns hide their scrollbars, so a blurred edge is the only sign
 	// that the list keeps going. Which column scrolls depends on the fold:
@@ -70,6 +106,21 @@
 	);
 
 	let activeRoom = $derived($hearthConfig.rooms.find((room) => room.id === activeRoomId));
+
+	// sideways swipes walk the pages in rail order; each layout has its own
+	// setting, since a mouse drag on a wall tablet is a different habit
+	let swipeEnabled = $derived(
+		($narrow ? $hearthConfig.swipe_navigation_mobile : $hearthConfig.swipe_navigation_desktop) ===
+			true &&
+			!$hearthEditMode &&
+			$layerDepth === 0
+	);
+	let activeIndex = $derived($hearthConfig.rooms.findIndex((room) => room.id === activeRoomId));
+
+	function swipeTo(direction: SwipeDirection) {
+		const roomId = neighborRoom($hearthConfig.rooms, activeRoomId, direction);
+		if (roomId) currentRoom.set(roomId);
+	}
 
 	// a fill page clips whatever does not fit, which is invisible until you walk
 	// to the tablet - so while editing, measure and say by how much
@@ -119,10 +170,11 @@
 	});
 
 	/*
-	 * Pages stay reachable on every layout. The folded layout always has the
-	 * page switcher; a wide rail whose nav widget was removed or is hidden by
-	 * its visibility conditions gets the same page list built in, above the
-	 * rest of the rail. The nav widget's own settings shape only the wide rail.
+	 * Pages stay reachable on every layout. The folded layout, and a wide one
+	 * with no rail, always have the page switcher; a wide rail whose nav widget
+	 * was removed or is hidden by its visibility conditions gets the same page
+	 * list built in, above the rest of the first rail. The nav widget's own
+	 * settings shape only the wide rail.
 	 */
 	const BUILT_IN_NAV: NavWidgetConfig = { id: 'built-in-nav', type: 'nav' };
 	// live results for the rail's media conditions, so a resize that hides the
@@ -139,6 +191,7 @@
 		);
 		return () => stops.forEach((stop) => stop());
 	});
+	let builtInNavSide = $derived<RailSide>(wideLayout === 'right' ? 'right' : 'left');
 	let railHasNav = $derived(
 		$hearthEditMode
 			? $hearthConfig.rail.some((widget) => widget.type === 'nav')
@@ -194,6 +247,14 @@
 		roomParamRead = true;
 	});
 
+	// see AlertHost in alertEngine.ts for why these are handed over
+	const alertHost: AlertHost = {
+		openDetail: openEntityDetail,
+		holds: conditionsHold,
+		layer,
+		loadMarkdown: loadMarkdownRenderer
+	};
+
 	// search only opens outside edit mode (see openSearch); should edit mode
 	// start while it is open anyway, it closes rather than staying stranded
 	// above the edit bar
@@ -213,6 +274,12 @@
 			class:fill={activeRoom?.fill_screen}
 			bind:this={mainElement}
 			use:scrollEdges={{ report: (edges) => (mainCut = edges) }}
+			use:swipeNav={{
+				enabled: swipeEnabled,
+				hasPrevious: activeIndex > 0,
+				hasNext: activeIndex >= 0 && activeIndex < $hearthConfig.rooms.length - 1,
+				onswipe: swipeTo
+			}}
 		>
 			{#if $hearthNeedsSetup && !$hearthLoadError && !$hearthEditMode && !$setupWizardOpen}
 				<div class="setup-prompt">
@@ -233,15 +300,26 @@
 	</div>
 {/snippet}
 
+{#snippet railColumn(side: RailSide)}
+	<div class="rail-scroll">
+		{#if !railHasNav && side === builtInNavSide}
+			<NavWidget widget={BUILT_IN_NAV} />
+		{/if}
+		<!-- a single rail holds every widget, whatever side it was given -->
+		<Rail side={wideLayout === 'both' ? side : undefined} onsearch={openSearch} />
+	</div>
+{/snippet}
+
 <section class="frame" use:wakeLock={$hearthConfig.keep_screen_on ?? true}>
 	<div
 		class="layout"
 		class:editing={$hearthEditMode}
 		class:narrow={$narrow}
+		data-rail={wideLayout}
 		bind:this={layoutElement}
 		use:scrollEdges={{ report: (edges) => (layoutCut = edges) }}
 	>
-		<PhoneNav onsearch={openSearch} />
+		<PhoneNav onsearch={openSearch} always={railPosition === 'none'} />
 		{#if $narrow}
 			{#if leadingWidgets > 0}
 				<div class="rail-run">
@@ -249,17 +327,20 @@
 				</div>
 			{/if}
 			{@render pageColumn()}
+			<!-- kept without a rail too: its padding is the room under the page -->
 			<div class="rail-run trailing">
-				<Rail mobileSlot="bottom" compact={$shortScreen} onsearch={openSearch} />
+				{#if railPosition !== 'none'}
+					<Rail mobileSlot="bottom" compact={$shortScreen} onsearch={openSearch} />
+				{/if}
 			</div>
 		{:else}
-			<div class="rail-scroll">
-				{#if !railHasNav}
-					<NavWidget widget={BUILT_IN_NAV} />
-				{/if}
-				<Rail onsearch={openSearch} />
-			</div>
+			{#if wideLayout === 'left' || wideLayout === 'both'}
+				{@render railColumn('left')}
+			{/if}
 			{@render pageColumn()}
+			{#if wideLayout === 'right' || wideLayout === 'both'}
+				{@render railColumn('right')}
+			{/if}
 		{/if}
 	</div>
 	{#if edgeBlur}
@@ -283,12 +364,21 @@
 	{#if showSearch}
 		<SearchOverlay onclose={() => (showSearch = false)} />
 	{/if}
-	{#if ($hearthConfig.screensaver_minutes ?? 0) > 0}
-		<Screensaver minutes={$hearthConfig.screensaver_minutes} />
+	{#if ($hearthConfig.screensaver_minutes ?? 0) > 0 || $screensaverPreview}
+		<!-- loads once armed; the dashboard never waits on it -->
+		{#await loadScreensaver() then Screensaver}
+			<Screensaver.default minutes={$hearthConfig.screensaver_minutes} />
+		{:catch}
+			<!-- offline or a stale deploy: no screensaver, tried again on the next mount -->
+		{/await}
 	{/if}
 	{#if $setupWizardOpen}
 		<SetupWizard firstRun={$hearthNeedsSetup} onclose={() => setupWizardOpen.set(false)} />
 	{/if}
+	<!-- alerts are not needed to draw the first frame; the layer loads after it -->
+	{#await import('./AlertLayer.svelte') then AlertLayer}
+		<AlertLayer.default host={alertHost} />
+	{/await}
 	<ConfirmDialog />
 	<Toasts {overflowBy} />
 	<EditBar {hideEditToggle} />
@@ -373,6 +463,7 @@
 		/* theme tokens are injected on:root via svelte:head (see rootCss) so
 		   portaled modals resolve them too */
 		width: 100%;
+		height: 100vh;
 		height: 100dvh;
 		position: relative;
 		overflow: hidden;
@@ -391,8 +482,27 @@
 		display: grid;
 		grid-template-columns: 300px 1fr;
 		gap: 32px;
-		padding: calc(40px + var(--h-pad-y)) calc(40px + var(--h-pad-x));
+		/* a phone held sideways can be wider than the fold (see breakpoints.ts),
+		   so the wide layout keeps clear of a landscape notch too */
+		padding: calc(40px + var(--h-pad-y) + env(safe-area-inset-top))
+			calc(40px + var(--h-pad-x) + env(safe-area-inset-right))
+			calc(40px + var(--h-pad-y) + env(safe-area-inset-bottom))
+			calc(40px + var(--h-pad-x) + env(safe-area-inset-left));
 		height: 100%;
+	}
+
+	.layout[data-rail='right'] {
+		grid-template-columns: 1fr 300px;
+	}
+
+	.layout[data-rail='both'] {
+		grid-template-columns: 300px 1fr 300px;
+	}
+
+	/* no rail: the page switcher sits over the page instead */
+	.layout[data-rail='none'] {
+		grid-template-columns: 1fr;
+		grid-template-rows: auto minmax(0, 1fr);
 	}
 
 	.rail-scroll::-webkit-scrollbar {
@@ -408,11 +518,22 @@
 		margin: -32px;
 	}
 
+	/* the page slides sideways during a swipe; past the column it would pass
+	   over the rail. The box matches the one .main already clips at. */
+	.layout:not(.narrow) .main-wrap {
+		overflow: clip;
+	}
+
 	.main {
 		height: 100%;
 		overflow-y: auto;
 		scrollbar-width: none;
 		padding: 32px;
+	}
+
+	/* with no rail the floating edit toggle sits over the foot of the page */
+	.layout:not(.narrow)[data-rail='none'] .main {
+		padding-bottom: 80px; /* literal ok: toggle height plus margin */
 	}
 
 	.main::-webkit-scrollbar {
@@ -478,8 +599,8 @@
 	   last widget so nothing hides behind it */
 	.layout.narrow.editing {
 		padding-bottom: calc(
-			112px + var(--h-pad-y) + env(safe-area-inset-bottom)
-		); /* literal ok: edit bar height plus margin */
+			var(--h-edit-bar-height, 60px) + 52px + var(--h-pad-y) + env(safe-area-inset-bottom)
+		); /* literal ok: margin around the measured edit bar */
 	}
 
 	/* the glow bleed shrinks to the layout's own padding so the columns end

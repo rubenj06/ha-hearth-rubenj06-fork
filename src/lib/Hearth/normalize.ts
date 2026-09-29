@@ -6,9 +6,18 @@ import type {
 	OverviewCard,
 	OverviewItem,
 	OverviewStack,
-	RailWidget
+	RailPosition,
+	RailWidget,
+	ScreensaverRadar
 } from './types';
-import { DEFAULT_HEARTH_CONFIG, normalizeVisibility, resizeCardColumns, uniqueId } from './config';
+import {
+	DEFAULT_HEARTH_CONFIG,
+	normalizeVisibility,
+	isTileUrl,
+	RADAR_ZOOM,
+	resizeCardColumns,
+	uniqueId
+} from './config';
 import {
 	isRecord,
 	normalizeFill,
@@ -24,6 +33,7 @@ import {
 	widgetDefinition
 } from './model/registry';
 import { currentHearthConfig } from './format';
+import { AlertRuleSchema, normalizeAlertRules } from './model/alerts';
 import * as v from 'valibot';
 import {
 	CardSharedSchema,
@@ -49,6 +59,9 @@ const VALID_WIDGET_DEFINITIONS = new Set<string>(WIDGET_DEFINITIONS.map(({ type 
  */
 const MOBILE_SLOTS = new Set<MobileSlot>(['top', 'bottom', 'hidden']);
 
+// left is the default, so it is stored as unset
+const RAIL_POSITIONS = new Set<RailPosition>(['right', 'both', 'none']);
+
 /** `mobile` if it names a slot, otherwise the slot the older `hide_mobile` meant. */
 function normalizeMobileSlot(widget: any): MobileSlot | undefined {
 	if (MOBILE_SLOTS.has(widget.mobile)) return widget.mobile;
@@ -61,6 +74,34 @@ function normalizeTheme(raw: unknown): HearthTheme | undefined {
 	return Object.fromEntries(
 		Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
 	);
+}
+
+const SCREENSAVER_CLOCK_SIZES = new Set<unknown>(['small', 'medium', 'large']);
+
+function coordinate(raw: unknown, limit: number): number | undefined {
+	return typeof raw === 'number' && Number.isFinite(raw) && Math.abs(raw) <= limit
+		? raw
+		: undefined;
+}
+
+/** Out-of-range zoom is clamped; unusable coordinates fall back to the home location. */
+function normalizeScreensaverRadar(raw: unknown): ScreensaverRadar | undefined {
+	if (!isRecord(raw)) return undefined;
+	const radar: ScreensaverRadar = {
+		latitude: coordinate(raw.latitude, 90),
+		longitude: coordinate(raw.longitude, 180),
+		zoom:
+			typeof raw.zoom === 'number' && Number.isFinite(raw.zoom)
+				? Math.min(RADAR_ZOOM.max, Math.max(RADAR_ZOOM.min, Math.round(raw.zoom)))
+				: undefined,
+		basemap: raw.basemap === 'light' || raw.basemap === 'dark' ? raw.basemap : undefined,
+		tile_url:
+			typeof raw.tile_url === 'string' && isTileUrl(raw.tile_url.trim())
+				? raw.tile_url.trim()
+				: undefined,
+		attribution: trimmedOrUndefined(raw.attribution)
+	};
+	return Object.values(radar).some((value) => value !== undefined) ? radar : undefined;
 }
 
 export function hearthConfigIssues(raw: unknown): string[] {
@@ -120,6 +161,22 @@ export function hearthConfigIssues(raw: unknown): string[] {
 			report(WidgetSharedSchema, widget, path);
 			report(widgetDefinition(widget.type)!.schema, widget, path);
 		});
+	}
+
+	if (raw.alerts !== undefined && raw.alerts !== null) {
+		if (!Array.isArray(raw.alerts)) issues.push('alerts must be a list');
+		else {
+			const alertIds = new Map<string, string>();
+			raw.alerts.forEach((rule, index) => {
+				const path = `alerts[${index}]`;
+				if (!isRecord(rule)) {
+					issues.push(`${path} must be an alert mapping`);
+					return;
+				}
+				checkId(rule.id, path, alertIds);
+				report(AlertRuleSchema, rule, path);
+			});
+		}
 	}
 
 	if (!Array.isArray(raw.rooms)) issues.push('rooms must be a list');
@@ -292,6 +349,7 @@ export function normalizeHearthConfig(raw: unknown): HearthConfig {
 			mobile: normalizeMobileSlot(widget),
 			// folded into `mobile` above; dropped so only one field decides
 			hide_mobile: undefined,
+			side: widget.side === 'right' ? 'right' : undefined,
 			visibility: normalizeVisibility(widget.visibility)
 		})) as RailWidget[];
 
@@ -302,15 +360,25 @@ export function normalizeHearthConfig(raw: unknown): HearthConfig {
 		'theme',
 		'theme_night',
 		'day_night',
+		'rail_position',
 		'rail',
 		'rooms',
 		'screensaver_minutes',
 		'screensaver_drift',
 		'screensaver_brightness',
+		'screensaver_background',
+		'screensaver_image',
+		'screensaver_radar',
+		'screensaver_show_date',
+		'screensaver_clock_size',
+		'screensaver_weather_entity',
 		'keep_screen_on',
 		'scroll_edge_blur',
+		'swipe_navigation_mobile',
+		'swipe_navigation_desktop',
 		'padding_x',
-		'padding_y'
+		'padding_y',
+		'alerts'
 	]) {
 		delete extensions[key];
 	}
@@ -320,6 +388,7 @@ export function normalizeHearthConfig(raw: unknown): HearthConfig {
 		theme: normalizeTheme(config.theme),
 		theme_night: normalizeTheme(config.theme_night),
 		day_night: dayNight,
+		rail_position: RAIL_POSITIONS.has(config.rail_position) ? config.rail_position : undefined,
 		rail,
 		rooms,
 		screensaver_minutes: normalizeWholeNumber(config.screensaver_minutes, 1),
@@ -329,10 +398,25 @@ export function normalizeHearthConfig(raw: unknown): HearthConfig {
 			Number.isFinite(config.screensaver_brightness)
 				? Math.min(100, Math.max(10, Math.round(config.screensaver_brightness)))
 				: undefined,
+		screensaver_background:
+			config.screensaver_background === 'image' || config.screensaver_background === 'radar'
+				? config.screensaver_background
+				: undefined,
+		screensaver_image: trimmedOrUndefined(config.screensaver_image),
+		screensaver_radar: normalizeScreensaverRadar(config.screensaver_radar),
+		screensaver_show_date:
+			typeof config.screensaver_show_date === 'boolean' ? config.screensaver_show_date : undefined,
+		screensaver_clock_size: SCREENSAVER_CLOCK_SIZES.has(config.screensaver_clock_size)
+			? config.screensaver_clock_size
+			: undefined,
+		screensaver_weather_entity: trimmedOrUndefined(config.screensaver_weather_entity),
 		keep_screen_on: typeof config.keep_screen_on === 'boolean' ? config.keep_screen_on : undefined,
 		scroll_edge_blur:
 			typeof config.scroll_edge_blur === 'boolean' ? config.scroll_edge_blur : undefined,
+		swipe_navigation_mobile: config.swipe_navigation_mobile === true ? true : undefined,
+		swipe_navigation_desktop: config.swipe_navigation_desktop === true ? true : undefined,
 		padding_x: normalizeWholeNumber(config.padding_x, 0),
-		padding_y: normalizeWholeNumber(config.padding_y, 0)
+		padding_y: normalizeWholeNumber(config.padding_y, 0),
+		alerts: normalizeAlertRules(config.alerts)
 	};
 }

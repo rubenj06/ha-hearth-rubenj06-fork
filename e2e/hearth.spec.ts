@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { load as parseYaml } from 'js-yaml';
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
-const FAKE_HASS = 'http://127.0.0.1:8124';
+const FAKE_HASS = `http://127.0.0.1:${process.env.E2E_HASS_PORT ?? 8124}`;
 const HEARTH_FILE = new URL('./fixture/data/hearth.yaml', import.meta.url);
 const HEARTH_FIXTURE = readFileSync(HEARTH_FILE, 'utf8');
 
@@ -53,6 +53,20 @@ test('serves Hearth branding at the root and has no alternate dashboard route', 
 	const manifest = await (await request.get('/hearth.webmanifest')).json();
 	expect(manifest.name).toBe('Hearth');
 	for (const icon of manifest.icons) expect((await request.get(icon.src)).status()).toBe(200);
+});
+
+test('keeps page response headers under the 4k nginx proxy buffer', async ({ request }) => {
+	const response = await request.get('/');
+	const headers = response.headersArray();
+	expect(headers.find(({ name }) => name.toLowerCase() === 'link')).toBeUndefined();
+	const size = headers.reduce(
+		(total, { name, value }) => total + name.length + value.length + 4,
+		0
+	);
+	expect(size).toBeLessThan(2048);
+	const head = (await response.text()).split('</head>')[0];
+	expect(head).toMatch(/<link href="[^"]+\.js" rel="modulepreload">/);
+	expect(head).toMatch(/<link href="[^"]+\.css" rel="preload" as="style">/);
 });
 
 test('boots against the entity snapshot and shows live state', async ({ page }) => {
@@ -201,5 +215,53 @@ test.describe('saving', () => {
 		await expect(page.getByText('Saved')).toBeVisible();
 		await page.reload();
 		await expect(page.getByText('Mine')).toBeVisible();
+	});
+});
+
+test.describe('camera playback', () => {
+	test.afterEach(() => writeFileSync(HEARTH_FILE, HEARTH_FIXTURE));
+
+	test('streams a WebRTC-only camera over WebRTC and leaves a snapshot camera alone', async ({
+		page,
+		request
+	}) => {
+		writeFileSync(
+			HEARTH_FILE,
+			HEARTH_FIXTURE.replace(
+				'            - entity: sensor.temperature\n',
+				`            - entity: sensor.temperature
+      - - id: door-camera
+          type: camera
+          entity: camera.door
+          title: Door camera
+          stream: true
+        - id: front-camera
+          type: camera
+          entity: camera.front
+          title: Front camera
+          stream: true
+`
+			)
+		);
+		await page.reload();
+		await expect(page.getByText('Door camera')).toBeVisible();
+		const requests = async () =>
+			(await (await request.get(`${FAKE_HASS}/_test/camera`)).json()) as {
+				type: string;
+				entity_id: string;
+			}[];
+		await expect
+			.poll(async () =>
+				(await requests())
+					.filter((message) => message.entity_id === 'camera.door')
+					.map((message) => message.type)
+			)
+			.toEqual(['camera/capabilities', 'camera/webrtc/get_client_config', 'camera/webrtc/offer']);
+		expect(
+			(await requests())
+				.filter((message) => message.entity_id === 'camera.front')
+				.map((message) => message.type)
+		).toEqual(['camera/capabilities']);
+		await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
 	});
 });

@@ -296,4 +296,13 @@
 		color: var(--h-on-art-1);
 		font-family: var(--h-font-mono);
 	}
+
+	/* an 18px bar is a hard target for a finger; the hit area grows, the bar does not */
+	@media (pointer: coarse) {
+		.progress::before {
+			content: '';
+			position: absolute;
+			inset: -13px 0; /* literal ok: 18px bar plus 13px each side is a 44px target */
+		}
+	}
 </style>

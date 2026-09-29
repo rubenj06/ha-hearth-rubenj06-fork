@@ -41,8 +41,10 @@
 		transition: transform var(--h-motion-fast) ease;
 	}
 
-	.close-button:hover {
-		color: var(--h-text-3);
+	@media (hover: hover) {
+		.close-button:hover {
+			color: var(--h-text-3);
+		}
 	}
 
 	.close-button:active {

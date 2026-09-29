@@ -65,26 +65,26 @@ afterEach(() => {
 describe('capabilities', () => {
 	it('reports a motor only on a touch device that exposes vibrate()', () => {
 		asAndroidPhone();
-		expect(hapticCapabilities()).toEqual({ vibration: true, taptic: false, secureContext: true });
+		expect(hapticCapabilities()).toEqual({ vibration: true, taptic: false });
 		expect(hapticsSupported()).toBe(true);
 	});
 
 	it('ignores vibrate() on a desktop pointer, where no motor exists', () => {
 		asDesktop();
-		expect(hapticCapabilities()).toEqual({ vibration: false, taptic: false, secureContext: true });
+		expect(hapticCapabilities()).toEqual({ vibration: false, taptic: false });
 		expect(hapticsSupported()).toBe(false);
 	});
 
 	it('recognizes iOS, which has no Vibration API at all', () => {
 		asIPhone();
-		expect(hapticCapabilities()).toEqual({ vibration: false, taptic: true, secureContext: true });
+		expect(hapticCapabilities()).toEqual({ vibration: false, taptic: true });
 		expect(hapticsSupported()).toBe(true);
 	});
 
 	it('refuses an insecure origin, where Chrome accepts the call and does nothing', () => {
 		asAndroidPhone();
 		secure(false);
-		expect(hapticCapabilities()).toEqual({ vibration: false, taptic: false, secureContext: false });
+		expect(hapticCapabilities()).toEqual({ vibration: false, taptic: false });
 		expect(hapticsSupported()).toBe(false);
 	});
 });

@@ -7,7 +7,15 @@ import { states } from '$lib/core/ha/entities';
 import { hassEntity } from '$lib/core/ha/testing';
 import { selectedLanguage } from '$lib/core/i18n';
 import { DEFAULT_HEARTH_CONFIG, type RailWidget } from '../config';
-import { cancelEdit, enterEditMode, hearthConfig, hearthEditMode, popup } from '../store';
+import {
+	activeAlerts,
+	alertListOpen,
+	cancelEdit,
+	enterEditMode,
+	hearthConfig,
+	hearthEditMode,
+	popup
+} from '../store';
 import RailWidgetRenderer from '../RailWidgetRenderer.svelte';
 
 vi.mock('$lib/core/ha/connection', async (original) => ({
@@ -94,6 +102,19 @@ describe('rail widgets', () => {
 		expect(container.textContent).not.toContain(en.hearth_no_notifications);
 		await act(() => enterEditMode());
 		expect(container.textContent).toContain(en.hearth_no_notifications);
+	});
+
+	it('counts raised alerts and opens the list on a tap', async () => {
+		activeAlerts.set([
+			{ key: 'rule:fridge', title: 'Fridge door open', severity: 'warning', popup: true, since: 1 }
+		]);
+		render(RailWidgetRenderer, { widget: widget({ type: 'notifications' }) });
+		const summary = screen.getByRole('button', { name: 'Notifications (1)' });
+		expect(summary.textContent).toContain('Fridge door open');
+		await fireEvent.click(summary);
+		expect(get(alertListOpen)).toBe(true);
+		activeAlerts.set([]);
+		alertListOpen.set(false);
 	});
 
 	it('keeps an all-clear status widget findable while editing', async () => {

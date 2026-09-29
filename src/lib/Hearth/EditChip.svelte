@@ -61,10 +61,13 @@
 		display: inline-flex;
 	}
 
-	.pencil:hover {
-		color: var(--h-accent-text);
+	@media (hover: hover) {
+		.pencil:hover {
+			color: var(--h-accent-text);
+		}
 	}
 
+	/* see breakpoints.ts */
 	@media (max-width: 900px) {
 		.chip {
 			top: -10px;

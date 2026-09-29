@@ -57,6 +57,15 @@ export function subscribeHassTriggers(listener: TriggerListener): () => void {
 	return () => triggerListeners.delete(listener);
 }
 
+type HearthEventListener = (data: Record<string, unknown>) => void;
+const hearthEventListeners = new Set<HearthEventListener>();
+
+/** Runs `listener` with the data of every HEARTH event, whatever it carries. */
+export function subscribeHearthEvents(listener: HearthEventListener): () => void {
+	hearthEventListeners.add(listener);
+	return () => hearthEventListeners.delete(listener);
+}
+
 const tokenStorage = {
 	async loadTokens() {
 		try {
@@ -227,9 +236,12 @@ export async function authentication(
 
 		trackSubscription(
 			conn.subscribeMessage(
-				(message: { variables?: { trigger?: { event?: { data?: { event?: unknown } } } } }) => {
+				(message: { variables?: { trigger?: { event?: { data?: unknown } } } }) => {
 					if (get(connection) !== conn) return;
-					const trigger = message?.variables?.trigger?.event?.data?.event;
+					const data = message?.variables?.trigger?.event?.data;
+					if (!data || typeof data !== 'object' || Array.isArray(data)) return;
+					for (const listener of hearthEventListeners) listener(data as Record<string, unknown>);
+					const trigger = (data as { event?: unknown }).event;
 					if (typeof trigger !== 'string') return;
 					event.set(trigger);
 					for (const listener of triggerListeners) listener(trigger);

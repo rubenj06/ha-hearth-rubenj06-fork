@@ -168,8 +168,10 @@
 		cursor: pointer;
 	}
 
-	button.row:hover {
-		background: rgb(var(--h-surface-rgb) / calc(0.075 * var(--h-fill-scale)));
+	@media (hover: hover) {
+		button.row:hover {
+			background: rgb(var(--h-surface-rgb) / calc(0.075 * var(--h-fill-scale)));
+		}
 	}
 
 	.row.inactive {

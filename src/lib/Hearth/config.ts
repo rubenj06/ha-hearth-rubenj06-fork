@@ -5,6 +5,8 @@ import type {
 	OverviewCard,
 	OverviewItem,
 	OverviewStack,
+	RailPosition,
+	RailSide,
 	RailWidget,
 	VisibilityCondition
 } from './types';
@@ -26,11 +28,18 @@ const GLANCE_TYPES = new Set<RailWidget['type']>(['clock', 'weather']);
 /**
  * The gap that divides the rail's two folded runs: a flexible gap with
  * widgets after it. A trailing one divides nothing - it only says the rail
- * keeps its widgets at the top of its own column - so it reports -1.
+ * keeps its widgets at the top of its own column - so it reports -1. With
+ * two rails, trailing means last on its own side: the other rail's widgets
+ * stored after it are not below it on screen.
  */
-export function railDividerIndex(rail: RailWidget[]): number {
+export function railDividerIndex(rail: RailWidget[], position: RailPosition = 'left'): number {
 	const index = rail.findIndex(isFlexibleGap);
-	return index === rail.length - 1 ? -1 : index;
+	if (index === -1) return -1;
+	const after = rail.slice(index + 1);
+	const side = railSideOf(rail[index]);
+	const divides =
+		position === 'both' ? after.some((widget) => railSideOf(widget) === side) : after.length > 0;
+	return divides ? index : -1;
 }
 
 /**
@@ -63,9 +72,13 @@ export function mobileSlotOf(widget: RailWidget, index: number, dividerIndex: nu
  */
 export function railSlots(
 	rail: RailWidget[],
-	{ includeHidden = false, compact = false }: { includeHidden?: boolean; compact?: boolean } = {}
+	{
+		includeHidden = false,
+		compact = false,
+		position
+	}: { includeHidden?: boolean; compact?: boolean; position?: RailPosition } = {}
 ): { top: RailWidget[]; bottom: RailWidget[] } {
-	const dividerIndex = railDividerIndex(rail);
+	const dividerIndex = railDividerIndex(rail, position);
 	const top: RailWidget[] = [];
 	const bottom: RailWidget[] = [];
 	rail.forEach((widget, index) => {
@@ -86,80 +99,55 @@ export function railSlots(
  */
 export function foldedTopCount(
 	rail: RailWidget[],
-	{ editing = false, compact = false }: { editing?: boolean; compact?: boolean } = {}
+	{
+		editing = false,
+		compact = false,
+		position
+	}: { editing?: boolean; compact?: boolean; position?: RailPosition } = {}
 ): number {
-	const { top } = railSlots(rail, { includeHidden: editing, compact });
+	const { top } = railSlots(rail, { includeHidden: editing, compact, position });
 	if (editing) return top.length;
 	return top.filter((widget) => widget.type !== 'nav' && widget.type !== 'search').length;
 }
 
-/*
- * Landing in a folded run stamps the widget with that run's slot, so the
- * arrangement the user made by hand stops depending on where the flexible gap
- * happens to sit. A widget hidden on mobile keeps its slot - it is only in a
- * run at all because the editor shows hidden widgets dimmed.
- */
-function stampSlot(widgets: RailWidget[], slot: Exclude<MobileSlot, 'hidden'>): RailWidget[] {
-	return widgets.map((widget) =>
-		widget.mobile === 'hidden' || widget.hide_mobile ? widget : { ...widget, mobile: slot }
-	);
+export function railPositionOf(config: Pick<HearthConfig, 'rail_position'>): RailPosition {
+	return config.rail_position ?? 'left';
 }
 
-/** One run rewritten, with the other left where it was. */
-function withRun(
-	run: RailWidget[],
-	rest: RailWidget[],
-	slot: Exclude<MobileSlot, 'hidden'>
-): RailWidget[] {
-	const placed = stampSlot(run, slot);
-	return slot === 'top' ? [...placed, ...rest] : [...rest, ...placed];
-}
-
-/** A folded run reordered within itself. */
-export function reorderSlot(
-	rail: RailWidget[],
-	slot: Exclude<MobileSlot, 'hidden'>,
-	run: RailWidget[]
-): RailWidget[] {
-	const moved = new Set(run.map((widget) => widget.id));
-	return withRun(
-		run,
-		rail.filter((widget) => !moved.has(widget.id)),
-		slot
-	);
+export function railSideOf(widget: RailWidget): RailSide {
+	return widget.side === 'right' ? 'right' : 'left';
 }
 
 /**
- * A widget dropped into a folded run at `index`, which is also what assigns
- * its slot - dragging past the page is the gesture for changing it. `copy`
- * leaves the original where it was and inserts a duplicate.
+ * The widgets each wide rail draws. A single rail holds every widget whatever
+ * side it was given, so switching back to one rail loses nothing; `none`
+ * draws neither.
  */
-export function placeInSlot(
+export function railSides(
 	rail: RailWidget[],
-	id: string,
-	slot: Exclude<MobileSlot, 'hidden'>,
-	index: number,
-	{ copy = false, compact = false }: { copy?: boolean; compact?: boolean } = {}
-): RailWidget[] {
-	const source = rail.find((widget) => widget.id === id);
-	if (!source) return rail;
+	position: RailPosition
+): { left: RailWidget[]; right: RailWidget[] } {
+	switch (position) {
+		case 'left':
+			return { left: rail, right: [] };
+		case 'right':
+			return { left: [], right: rail };
+		case 'none':
+			return { left: [], right: [] };
+		case 'both':
+			return {
+				left: rail.filter((widget) => railSideOf(widget) === 'left'),
+				right: rail.filter((widget) => railSideOf(widget) === 'right')
+			};
+	}
+}
 
-	const entry = copy
-		? {
-				...structuredClone(source),
-				id: uniqueId(
-					slugify(source.type),
-					rail.map((widget) => widget.id)
-				)
-			}
-		: source;
-	const remaining = copy ? rail : rail.filter((widget) => widget.id !== id);
-
-	// hidden widgets stay in the split so the rewrite below keeps them
-	const runs = railSlots(remaining, { includeHidden: true, compact });
-	const run = [...runs[slot]];
-	run.splice(index, 0, entry as RailWidget);
-	return withRun(run, slot === 'top' ? runs.bottom : runs.top, slot);
+/**
+ * The rail as the folded layout reads it: every widget in stored order, which
+ * is the order dragging in the folded runs writes. No rail folds to nothing.
+ */
+export function foldedRail(rail: RailWidget[], position: RailPosition): RailWidget[] {
+	return position === 'none' ? [] : rail;
 }
 
 export function isStack(item: OverviewItem): item is OverviewStack {
@@ -206,6 +194,9 @@ export function wildcardEntityIds(pattern: string | undefined, entityIds: string
 }
 
 /** Card types that take a share of the leftover height unless told otherwise. */
+/** The longest an alert rule may wait, one day; longer waits belong in Home Assistant. */
+export const MAX_ALERT_SECONDS = 86_400;
+
 export const DEFAULT_HEARTH_CONFIG: HearthConfig = {
 	// sun.sun is part of a standard Home Assistant installation; without a
 	// configured night theme this switch is inert.
@@ -330,6 +321,17 @@ export function moveItem<T>(list: T[], index: number, delta: number) {
 	if (index < 0 || target < 0 || target >= list.length) return;
 	const [item] = list.splice(index, 1);
 	list.splice(target, 0, item);
+}
+
+/**
+ * Map zoom range for the sleep screen radar. RainViewer serves radar tiles up
+ * to zoom 7, and nothing below 3 shows weather at a useful scale.
+ */
+export const RADAR_ZOOM = { min: 3, max: 7, fallback: 6 } as const;
+
+/** A Leaflet raster tile template: http(s) with {z}, {x} and {y} placeholders. */
+export function isTileUrl(value: string): boolean {
+	return /^https?:\/\//.test(value) && ['{z}', '{x}', '{y}'].every((part) => value.includes(part));
 }
 
 export const PRESS_RIPPLE = {

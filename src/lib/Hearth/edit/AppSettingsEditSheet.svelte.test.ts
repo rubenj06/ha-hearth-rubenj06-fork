@@ -8,6 +8,7 @@ import {
 	requestedConfirmation
 } from '../store';
 import { configuration } from '$lib/core/app/configuration';
+import { deviceName, saveDeviceName } from '$lib/core/app/device';
 import en from '../../../../static/translations/en.json';
 import AppSettingsEditSheet from './AppSettingsEditSheet.svelte';
 
@@ -145,5 +146,49 @@ describe('AppSettingsEditSheet revision conflict', () => {
 		await waitFor(() => expect(get(editor)).toBeNull());
 		expect(saves.map((save) => save.revision)).toEqual([4, 7]);
 		expect(get(configuration)?.revision).toBe(8);
+	});
+});
+
+describe('AppSettingsEditSheet device name', () => {
+	beforeEach(() => {
+		configuration.set({ locale: 'en', revision: 1 } as never);
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (address: string) =>
+				address.endsWith('/_api/save_config')
+					? { ok: true, status: 200, json: async (): Promise<unknown> => ({ revision: 2 }) }
+					: { ok: false, json: async (): Promise<unknown> => null }
+			)
+		);
+		editor.set({ kind: 'appSettings' });
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+		editor.set(null);
+		configuration.set(undefined as never);
+		saveDeviceName('');
+	});
+
+	it('keeps the name in this browser once saved', async () => {
+		render(AppSettingsEditSheet);
+		await fireEvent.input(screen.getByLabelText(en.hearth_device_name), {
+			target: { value: ' kitchen ' }
+		});
+		await fireEvent.click(screen.getByRole('button', { name: en.save }));
+		await waitFor(() => expect(get(editor)).toBeNull());
+		expect(get(deviceName)).toBe('kitchen');
+		expect(localStorage.getItem('hearthDevice')).toBe('kitchen');
+	});
+
+	it('leaves a name from the URL out of storage when another setting is saved', async () => {
+		localStorage.removeItem('hearthDevice');
+		deviceName.set('hall');
+		render(AppSettingsEditSheet);
+		await stageAChange();
+		await fireEvent.click(screen.getByRole('button', { name: en.save }));
+		await waitFor(() => expect(get(editor)).toBeNull());
+		expect(localStorage.getItem('hearthDevice')).toBeNull();
+		expect(get(deviceName)).toBe('hall');
 	});
 });

@@ -4,6 +4,7 @@
 	import { activateOnKeyboard } from './interaction';
 	import { states } from '$lib/core/ha/entities';
 	import { hearthEditMode } from './store';
+	import { imageSource } from './images';
 	import { sensorNumber } from '$lib/core/ha/entities';
 	import Icon from './Icon.svelte';
 
@@ -13,6 +14,7 @@
 		subtitle = undefined,
 		tempEntity = undefined,
 		humidityEntity = undefined,
+		backgroundImage = undefined,
 		onedit = undefined
 	}: {
 		icon?: string;
@@ -20,10 +22,17 @@
 		subtitle?: string;
 		tempEntity?: string;
 		humidityEntity?: string;
+		/** A URL, or `hearth-images/<file>` for an uploaded image. */
+		backgroundImage?: string;
 		onedit?: () => void;
 	} = $props();
 
 	let editable = $derived($hearthEditMode && !!onedit);
+
+	let background = $derived(imageSource(backgroundImage));
+	// the source that failed rather than a flag, so a new image is tried again
+	let failedBackground = $state<string>();
+	let banner = $derived(!!background && background !== failedBackground);
 
 	let climate = $derived.by(() => {
 		const temp = sensorNumber(tempEntity ? $states?.[tempEntity]?.state : undefined);
@@ -36,6 +45,15 @@
 </script>
 
 {#snippet content()}
+	{#if background && background !== failedBackground}
+		<img
+			class="backdrop"
+			src={background}
+			alt=""
+			decoding="async"
+			onerror={() => (failedBackground = background)}
+		/>
+	{/if}
 	<div class="icon-tile">
 		<Icon name={icon || 'home'} size={ICON.hero} color="var(--h-accent-text)" />
 	</div>
@@ -68,6 +86,7 @@
 {#if editable && onedit}
 	<div
 		class="header editable"
+		class:banner
 		role="button"
 		tabindex="0"
 		onclick={onedit}
@@ -76,7 +95,7 @@
 		{@render content()}
 	</div>
 {:else}
-	<div class="header">{@render content()}</div>
+	<div class="header" class:banner>{@render content()}</div>
 {/if}
 
 <style>
@@ -90,6 +109,40 @@
 
 	.header.editable {
 		cursor: pointer;
+	}
+
+	.header.banner {
+		position: relative;
+		isolation: isolate;
+		padding: 24px;
+		border-radius: var(--h-radius-card);
+		border: 1px solid rgb(var(--h-line-rgb) / calc(0.07 * var(--h-line-scale)));
+		box-shadow: var(--h-card-shadow);
+		overflow: hidden;
+	}
+
+	/* a wash of the theme's own background keeps title and chips legible over
+	   any photo, in light and dark themes alike; as ::after it paints over the
+	   image, which shares its layer */
+	.header.banner::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		background: linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--h-bg-1) 82%, transparent),
+			color-mix(in srgb, var(--h-bg-1) 30%, transparent)
+		);
+	}
+
+	.backdrop {
+		position: absolute;
+		inset: 0;
+		z-index: -1;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 
 	.edit-hint {

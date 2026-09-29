@@ -98,8 +98,10 @@
 		-webkit-user-select: none;
 	}
 
-	.row.action:hover {
-		background: rgb(var(--h-surface-rgb) / calc(0.04 * var(--h-fill-scale)));
+	@media (hover: hover) {
+		.row.action:hover {
+			background: rgb(var(--h-surface-rgb) / calc(0.04 * var(--h-fill-scale)));
+		}
 	}
 
 	.row.danger .row-label {

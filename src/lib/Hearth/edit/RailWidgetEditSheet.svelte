@@ -4,8 +4,16 @@
 	import { get } from 'svelte/store';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { activateOnKeyboard } from '../interaction';
-	import type { MobileSlot, RailWidget, VisibilityCondition } from '../types';
-	import { moveItem, normalizeVisibility, PRESS_RIPPLE, slugify, uniqueId } from '../config';
+	import type { MobileSlot, RailSide, RailWidget, VisibilityCondition } from '../types';
+	import { moveRailWidget, moveToSide } from '../model/railMoves';
+	import {
+		normalizeVisibility,
+		PRESS_RIPPLE,
+		railPositionOf,
+		railSideOf,
+		slugify,
+		uniqueId
+	} from '../config';
 	import { RAIL_WIDGET_TYPES, widgetDescriptor, type WidgetDraft } from '../widgets';
 	import { editor, hearthConfig, updateConfig } from '../store';
 	import EditSheet from './EditSheet.svelte';
@@ -15,7 +23,7 @@
 	import PreviewPane from './PreviewPane.svelte';
 	import VisibilitySection from './VisibilitySection.svelte';
 
-	let { index }: { index: number | null } = $props();
+	let { index, side: addedFrom }: { index: number | null; side?: RailSide } = $props();
 
 	// initial value only - the sheet is remounted per editor target via {#key}
 	// svelte-ignore state_referenced_locally
@@ -26,6 +34,8 @@
 	let mobile = $state<MobileSlot | undefined>(
 		initial?.mobile ?? (initial?.hide_mobile ? 'hidden' : undefined)
 	);
+	// svelte-ignore state_referenced_locally
+	let side = $state<RailSide>(initial ? railSideOf(initial) : (addedFrom ?? 'left'));
 	let visibility = $state<VisibilityCondition[]>(
 		(initial?.visibility ?? []).map((condition) => ({ ...condition }))
 	);
@@ -34,6 +44,7 @@
 	let draft = $state<WidgetDraft<RailWidget>>({ fields: {} as WidgetDraft<RailWidget>['fields'] });
 
 	let descriptor = $derived(widgetDescriptor(type));
+	let twoRails = $derived(railPositionOf($hearthConfig) === 'both');
 	let editorInitial = $derived(initial?.type === type ? initial : undefined);
 
 	const MOBILE_CHOICES = [
@@ -41,6 +52,11 @@
 		{ slot: 'top', label: 'hearth_mobile_above_page', icon: 'vertical_align_top' },
 		{ slot: 'bottom', label: 'hearth_mobile_below_page', icon: 'vertical_align_bottom' },
 		{ slot: 'hidden', label: 'hearth_hide_on_mobile', icon: 'smartphone' }
+	] as const;
+
+	const SIDE_CHOICES = [
+		{ side: 'left', label: 'hearth_left_sidebar', icon: 'dock_to_left' },
+		{ side: 'right', label: 'hearth_right_sidebar', icon: 'dock_to_right' }
 	] as const;
 
 	function close() {
@@ -63,6 +79,7 @@
 			mobile,
 			// superseded by `mobile`; a saved widget never carries both
 			hide_mobile: undefined,
+			side: side === 'right' ? 'right' : undefined,
 			visibility: normalizeVisibility($state.snapshot(visibility))
 		} as RailWidget;
 	}
@@ -76,13 +93,21 @@
 
 	function done() {
 		updateConfig((config) => {
+			let id: string;
 			if (initial) {
+				id = initial.id;
 				const position = widgetIndex(config.rail);
-				if (position >= 0) config.rail[position] = buildWidget(initial.id);
+				if (position >= 0) config.rail[position] = buildWidget(id);
 			} else {
-				const taken = config.rail.map((widget) => widget.id);
-				config.rail.push(buildWidget(uniqueId(slugify(type), taken)));
+				id = uniqueId(
+					slugify(type),
+					config.rail.map((widget) => widget.id)
+				);
+				config.rail.push(buildWidget(id));
 			}
+			// a new widget, or one sent to the other rail, goes to the end of its rail
+			const sideChanged = !initial || railSideOf(initial) !== side;
+			if (twoRails && sideChanged) config.rail = moveToSide(config.rail, id, side);
 		});
 		close();
 	}
@@ -95,8 +120,10 @@
 		close();
 	}
 
-	function move(delta: number) {
-		updateConfig((config) => moveItem(config.rail, widgetIndex(config.rail), delta));
+	function move(delta: -1 | 1) {
+		updateConfig((config) =>
+			moveRailWidget(config.rail, widgetIndex(config.rail), delta, railPositionOf(config))
+		);
 	}
 </script>
 
@@ -142,6 +169,27 @@
 					if (mobile === 'hidden') mobile = undefined;
 				}}
 			/>
+
+			{#if twoRails}
+				<div class="group-label">{$lang('hearth_widget_side')}</div>
+				<div class="chips">
+					{#each SIDE_CHOICES as choice (choice.side)}
+						<span
+							class="chip pressable"
+							class:active={side === choice.side}
+							use:Ripple={PRESS_RIPPLE}
+							role="button"
+							tabindex="0"
+							aria-pressed={side === choice.side}
+							onclick={() => (side = choice.side)}
+							onkeydown={(event) => activateOnKeyboard(event, () => (side = choice.side))}
+						>
+							<Icon name={choice.icon} size={ICON.inline} />
+							{$lang(choice.label)}
+						</span>
+					{/each}
+				</div>
+			{/if}
 
 			<div class="group-label">{$lang('hearth_on_mobile')}</div>
 			<div class="chips">

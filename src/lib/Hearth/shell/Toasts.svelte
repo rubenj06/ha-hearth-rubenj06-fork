@@ -364,12 +364,32 @@
 		font-weight: 600;
 		box-shadow: var(--h-shadow-toast);
 	}
-	/* the edit bar sits along the bottom while editing; the toast moves above it */
+	/* the edit bar sits along the bottom while editing; the toast moves above
+	   it, by the height the bar publishes since it wraps on a phone */
 	.save-toast.editing,
 	.command-error.editing {
-		/* the same room the layout leaves for the edit bar */
 		bottom: calc(
-			112px + var(--h-pad-y) + env(safe-area-inset-bottom)
-		); /* literal ok: edit bar height plus margin */
+			18px + var(--h-pad-y) + var(--h-edit-bar-height, 60px) + 16px
+		); /* literal ok: fallback until the bar is measured */
+	}
+
+	/* see breakpoints.ts */
+	@media (max-width: 900px) {
+		/* the page switcher is pinned to the top of a folded layout and carries
+		   the status bar inset; the top toasts sit under both */
+		.connection-toast,
+		.load-errors,
+		.save-alert,
+		.overflow-toast {
+			top: calc(72px + env(safe-area-inset-top)); /* literal ok: page switcher height plus margin */
+		}
+
+		/* the folded edit bar hugs the bottom edge above the home indicator */
+		.save-toast.editing,
+		.command-error.editing {
+			bottom: calc(
+				8px + env(safe-area-inset-bottom) + var(--h-edit-bar-height, 60px) + 16px
+			); /* literal ok: fallback until the bar is measured */
+		}
 	}
 </style>

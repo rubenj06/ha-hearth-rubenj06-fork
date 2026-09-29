@@ -7,29 +7,12 @@
 	import { openEntityDetail } from '$lib/Hearth/details';
 	import { displayTimeZone } from '../../store';
 	import Icon from '../../Icon.svelte';
+	import { conditionIcon } from './conditions';
 
 	import type { WeatherWidget } from './descriptor';
 
 	let { widget }: { widget: WeatherWidget } = $props();
 	let weatherEntity = $derived(widget.entity);
-
-	const conditionIcons: Record<string, string> = {
-		'clear-night': 'clear_night',
-		cloudy: 'cloud',
-		fog: 'foggy',
-		hail: 'weather_hail',
-		lightning: 'thunderstorm',
-		'lightning-rainy': 'thunderstorm',
-		partlycloudy: 'partly_cloudy_day',
-		pouring: 'rainy',
-		rainy: 'rainy',
-		snowy: 'weather_snowy',
-		'snowy-rainy': 'weather_mix',
-		sunny: 'clear_day',
-		windy: 'air',
-		'windy-variant': 'air',
-		exceptional: 'warning'
-	};
 
 	interface ForecastDay {
 		day: string;
@@ -86,7 +69,7 @@
 {#snippet content()}
 	<div class="row">
 		<Icon
-			name={available ? (conditionIcons[condition] ?? 'cloud') : 'cloud_off'}
+			name={available ? conditionIcon(condition) : 'cloud_off'}
 			size={ICON.control}
 			color={available ? 'rgb(var(--h-accent-rgb))' : 'var(--h-icon)'}
 			fill={available}

@@ -9,6 +9,7 @@ import { conditionalMediaCard } from './conditional_media/descriptor';
 import { daysSinceCard } from './days_since/descriptor';
 import { entitiesCard } from './entities/descriptor';
 import { headerCard } from './header/descriptor';
+import { iframeCard } from './iframe/descriptor';
 import { imageCard } from './image/descriptor';
 import { mediaCard } from './media/descriptor';
 import { scenesCard } from './scenes/descriptor';
@@ -27,6 +28,7 @@ const REGISTERED = [
 	imageCard,
 	climateCard,
 	scenesCard,
+	iframeCard,
 	daysSinceCard,
 	conditionalMediaCard
 ] as const;

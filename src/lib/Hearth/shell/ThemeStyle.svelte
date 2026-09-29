@@ -10,6 +10,7 @@
 		type HearthTheme
 	} from '$lib/core/theme';
 	import { editedThemeSlot, editor, hearthConfig, hearthEditMode } from '../store';
+	import { resolveBackgroundImage } from '../images';
 
 	/** A display-only preset from ?theme=, replacing the stored theme without touching the config. */
 	let { presetOverride = undefined }: { presetOverride?: { theme: HearthTheme | null } } = $props();
@@ -29,7 +30,18 @@
 		night ? ($hearthConfig.theme_night ?? $hearthConfig.theme) : $hearthConfig.theme
 	);
 
-	let activeTheme = $derived(presetOverride ? (presetOverride.theme ?? undefined) : storedTheme);
+	let chosenTheme = $derived(presetOverride ? (presetOverride.theme ?? undefined) : storedTheme);
+
+	// an uploaded background is stored without the base path, which only the
+	// browser knows
+	let activeTheme = $derived(
+		chosenTheme?.background_image
+			? {
+					...chosenTheme,
+					background_image: resolveBackgroundImage(chosenTheme.background_image)!
+				}
+			: chosenTheme
+	);
 
 	// CSS custom properties do not transition by themselves. Briefly blanket
 	// the rendered tree when the switch changes, then release component styles.

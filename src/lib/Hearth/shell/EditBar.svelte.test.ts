@@ -64,6 +64,21 @@ describe('EditBar', () => {
 		expect(get(hearthConfig).rooms[0].name).toBe(DEFAULT_HEARTH_CONFIG.rooms[0].name);
 	});
 
+	it('publishes its height to the parent so the toasts can clear it', async () => {
+		// jsdom lays nothing out; stand in for a bar wrapped onto two rows
+		const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(104);
+		try {
+			const { container, unmount } = renderBar();
+			await waitFor(() =>
+				expect(container.style.getPropertyValue('--h-edit-bar-height')).toBe('104px')
+			);
+			unmount();
+			expect(container.style.getPropertyValue('--h-edit-bar-height')).toBe('');
+		} finally {
+			height.mockRestore();
+		}
+	});
+
 	describe('copying edits after a conflict', () => {
 		beforeEach(() => saveState.set('conflict'));
 

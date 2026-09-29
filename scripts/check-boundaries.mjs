@@ -37,7 +37,7 @@ const LAYERS = [
 	{ name: 'core', match: ['src/lib/core/'], allowed: [] },
 	{
 		name: 'routes',
-		match: ['src/routes/'],
+		match: ['src/routes/', 'src/hooks.server.ts'],
 		allowed: ['hearth', 'model', 'core', 'ui', 'server']
 	}
 ];

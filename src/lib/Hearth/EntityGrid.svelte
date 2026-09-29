@@ -44,14 +44,19 @@
 	} = $props();
 
 	const entityGroup = 'hearth-card-entities';
+
+	// a tablet card's four tracks would leave phone tiles too narrow to read
+	const FOLDED_MAX_COLUMNS = 2;
 </script>
 
 <div
 	class="grid"
 	class:editing={$hearthEditMode && Boolean(cardId) && showDragHandles}
 	class:empty={entities.length === 0}
+	class:fixed={Boolean(columns)}
 	style:--min-tile-width="{minTileWidth}px"
-	style:grid-template-columns={columns ? `repeat(${columns}, minmax(0, 1fr))` : undefined}
+	style:--columns={columns || undefined}
+	style:--folded-columns={columns ? Math.min(columns, FOLDED_MAX_COLUMNS) : undefined}
 	use:sortable={{
 		group: entityGroup,
 		handle: '.entity-drag-handle',
@@ -95,8 +100,14 @@
 <style>
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(var(--min-tile-width), 1fr));
+		/* the min() keeps a track from outgrowing a container narrower than
+		   the minimum, which would push tiles past the card's edge */
+		grid-template-columns: repeat(auto-fill, minmax(min(var(--min-tile-width), 100%), 1fr));
 		gap: 12px;
+	}
+
+	.grid.fixed {
+		grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
 	}
 
 	.grid.editing.empty {
@@ -144,11 +155,29 @@
 		touch-action: none;
 	}
 
+	/* a finger-sized hit area around the small visible handle */
+	@media (pointer: coarse) {
+		.entity-drag-handle::before {
+			content: '';
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 44px;
+			height: 44px;
+			transform: translate(-50%, -50%);
+		}
+	}
+
 	.entity-slot:global(.sortable-ghost) {
 		opacity: 0.35;
 	}
 
+	/* see breakpoints.ts */
 	@media (max-width: 900px) {
+		.grid.fixed {
+			grid-template-columns: repeat(var(--folded-columns), minmax(0, 1fr));
+		}
+
 		/* one tile per row while editing: the handle column would otherwise
 		   truncate every name */
 		.grid.editing {

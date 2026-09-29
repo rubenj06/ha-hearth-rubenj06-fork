@@ -1,16 +1,19 @@
 <script lang="ts">
+	import { get } from 'svelte/store';
 	import { lang } from '$lib/core/i18n';
+	import { commandFailure } from '$lib/core/ha/commands';
 	import { sortable } from '$lib/ui/actions/sortable';
 	import { onDndReceive, type DndReceiveDetail } from './drag';
 	import {
 		mobileSlotOf,
-		placeInSlot,
 		railDividerIndex,
+		railPositionOf,
+		railSides,
 		railSlots,
-		reorderSlot,
 		slugify,
 		uniqueId,
 		type MobileSlot,
+		type RailSide,
 		type RailWidget
 	} from './config';
 	import { editor, hearthConfig, hearthEditMode, updateConfig } from './store';
@@ -20,30 +23,39 @@
 	import VisibilityGate from './VisibilityGate.svelte';
 
 	/**
-	 * The whole rail, or one of the two runs the folded layout splits it into.
-	 * Both runs share a drag group, so moving a widget past the page is how you
-	 * change its slot by hand.
+	 * The whole rail, one of two wide rails (`side`), or one of the two runs
+	 * the folded layout splits it into. Every one shares a drag group, so
+	 * moving a widget past the page is how you change its slot or side by hand.
 	 */
 	let {
 		onsearch,
 		mobileSlot,
+		side,
 		compact = false
 	}: {
 		onsearch: () => void;
 		mobileSlot?: Exclude<MobileSlot, 'hidden'>;
+		side?: RailSide;
 		compact?: boolean;
 	} = $props();
 
-	let dividerIndex = $derived(railDividerIndex($hearthConfig.rail));
+	let position = $derived(railPositionOf($hearthConfig));
+	// the folded runs read both rails as one list in stored order
+	let dividerIndex = $derived(railDividerIndex($hearthConfig.rail, position));
 	let indexOfId = $derived(
 		new Map($hearthConfig.rail.map((widget, index) => [widget.id, index] as const))
 	);
 
-	let widgets = $derived(
-		mobileSlot
-			? railSlots($hearthConfig.rail, { includeHidden: $hearthEditMode, compact })[mobileSlot]
-			: $hearthConfig.rail
-	);
+	let widgets = $derived.by(() => {
+		if (mobileSlot) {
+			return railSlots($hearthConfig.rail, {
+				includeHidden: $hearthEditMode,
+				compact,
+				position
+			})[mobileSlot];
+		}
+		return side ? railSides($hearthConfig.rail, 'both')[side] : $hearthConfig.rail;
+	});
 
 	function railIndex(widget: RailWidget): number {
 		return indexOfId.get(widget.id) ?? 0;
@@ -53,23 +65,56 @@
 		return !!mobileSlot && mobileSlotOf(widget, railIndex(widget), dividerIndex) === 'hidden';
 	}
 
+	/*
+	 * Only edit mode moves widgets, so the helpers stay out of the eager
+	 * bundle. They start loading as edit mode opens, and a drop that still
+	 * beats them - or lands after edit mode closed - changes nothing.
+	 */
+	const railMoves = () => import('./model/railMoves');
+
+	$effect(() => {
+		if ($hearthEditMode) railMoves().catch(() => {});
+	});
+
+	async function withRailMoves(apply: (moves: typeof import('./model/railMoves')) => void) {
+		let moves: typeof import('./model/railMoves');
+		try {
+			moves = await railMoves();
+		} catch (error) {
+			console.error(error);
+			commandFailure.set({ entityId: null, detail: get(lang)('hearth_could_not_load_component') });
+			return;
+		}
+		if (get(hearthEditMode)) apply(moves);
+	}
+
 	function commit(items: RailWidget[]) {
-		updateConfig((config) => {
-			config.rail = mobileSlot ? reorderSlot(config.rail, mobileSlot, items) : items;
+		return withRailMoves(({ reorderSide, reorderSlot }) => {
+			updateConfig((config) => {
+				if (mobileSlot) config.rail = reorderSlot(config.rail, mobileSlot, items);
+				else config.rail = side ? reorderSide(config.rail, side, items) : items;
+			});
 		});
 	}
 
 	/*
-	 * A widget dragged in from the other run. SortableJS reverts the DOM and
-	 * leaves the data to us, so the drop is what assigns the slot.
+	 * A widget dragged in from the other run or rail. SortableJS reverts the
+	 * DOM and leaves the data to us, so the drop is what assigns the slot or
+	 * side.
 	 */
 	function receive(detail: DndReceiveDetail) {
-		if (!mobileSlot) return;
-		const slot = mobileSlot;
-		updateConfig((config) => {
-			config.rail = placeInSlot(config.rail, detail.id, slot, detail.newIndex, {
-				copy: detail.alt ?? false,
-				compact
+		const copy = detail.alt ?? false;
+		return withRailMoves(({ placeInSide, placeInSlot }) => {
+			updateConfig((config) => {
+				if (mobileSlot) {
+					config.rail = placeInSlot(config.rail, detail.id, mobileSlot, detail.newIndex, {
+						copy,
+						compact,
+						position
+					});
+				} else if (side) {
+					config.rail = placeInSide(config.rail, detail.id, side, detail.newIndex, { copy });
+				}
 			});
 		});
 	}
@@ -124,7 +169,7 @@
 	{#if $hearthEditMode && mobileSlot !== 'top'}
 		<AddControl
 			label={$lang('hearth_add_widget')}
-			onadd={() => editor.set({ kind: 'railWidget', index: null })}
+			onadd={() => editor.set({ kind: 'railWidget', index: null, side })}
 		/>
 	{/if}
 </div>

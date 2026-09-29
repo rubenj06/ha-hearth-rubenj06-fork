@@ -156,7 +156,7 @@
 		border-radius: var(--h-radius-md);
 		/* pan-y, not none: the horizontal gesture stays ours while a vertical
 		   swipe still scrolls the page or an enclosing popover */
-		touch-action: pan-y;
+		touch-action: pan-y pinch-zoom;
 		user-select: none;
 		-webkit-user-select: none;
 		background: rgb(var(--h-surface-rgb) / calc(0.045 * var(--h-fill-scale)));

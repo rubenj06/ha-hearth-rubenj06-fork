@@ -33,7 +33,9 @@
 		cursor: pointer;
 	}
 
-	.search-button:hover {
-		background: rgb(var(--h-surface-rgb) / calc(0.075 * var(--h-fill-scale)));
+	@media (hover: hover) {
+		.search-button:hover {
+			background: rgb(var(--h-surface-rgb) / calc(0.075 * var(--h-fill-scale)));
+		}
 	}
 </style>

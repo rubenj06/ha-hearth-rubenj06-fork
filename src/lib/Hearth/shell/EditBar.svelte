@@ -2,7 +2,7 @@
 	import { ICON } from '../iconSizes';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { lang } from '$lib/core/i18n';
-	import { PRESS_RIPPLE } from '../config';
+	import { PRESS_RIPPLE, railPositionOf } from '../config';
 	import {
 		cancelEdit,
 		canRedo,
@@ -24,6 +24,9 @@
 	import Icon from '../Icon.svelte';
 
 	let { hideEditToggle = false }: { hideEditToggle?: boolean } = $props();
+
+	// the toggle sits at the rail's foot, so a lone right rail takes it along
+	let toggleRight = $derived(railPositionOf($hearthConfig) === 'right');
 
 	// The YAML serializer pulls in js-yaml, which stays out of the eager bundle.
 	// Loading starts with the bar so the copy click does not wait on the
@@ -67,6 +70,28 @@
 		});
 	}
 
+	/*
+	 * The bar wraps onto a second row on a phone when the save error and its
+	 * actions join it. Its height goes to the shared parent as
+	 * --h-edit-bar-height so the toasts above it can follow.
+	 */
+	let bar = $state<HTMLElement | null>(null);
+
+	$effect(() => {
+		const host = bar?.parentElement;
+		if (!bar || !host) return;
+		const element = bar;
+		const measure = () =>
+			host.style.setProperty('--h-edit-bar-height', `${element.offsetHeight}px`);
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(element);
+		return () => {
+			observer.disconnect();
+			host.style.removeProperty('--h-edit-bar-height');
+		};
+	});
+
 	function confirmOverwrite() {
 		requestConfirmation({
 			title: $lang('hearth_overwrite_newer_hearth_configuration'),
@@ -78,7 +103,7 @@
 </script>
 
 {#if $hearthEditMode}
-	<div class="edit-bar">
+	<div class="edit-bar" bind:this={bar}>
 		{#if $saveState === 'conflict'}
 			<span class="save-error">{$lang('hearth_config_changed')}</span>
 			<button
@@ -158,6 +183,7 @@
 	<button
 		type="button"
 		class="edit-toggle pressable"
+		class:right={toggleRight}
 		aria-label={$lang('hearth_edit_configuration')}
 		onclick={enterEditMode}
 	>
@@ -170,8 +196,9 @@
 	/* a labeled row at the rail's foot rather than an anonymous floating pencil */
 	.edit-toggle {
 		position: absolute;
-		left: calc(14px + var(--h-pad-x));
-		bottom: calc(14px + var(--h-pad-y));
+		/* the insets clear an installed app's home indicator and a landscape cutout */
+		left: calc(14px + var(--h-pad-x) + env(safe-area-inset-left));
+		bottom: calc(14px + var(--h-pad-y) + env(safe-area-inset-bottom));
 		z-index: var(--h-layer-bar);
 		display: flex;
 		align-items: center;
@@ -187,10 +214,20 @@
 		font-family: inherit;
 	}
 
-	.edit-toggle:hover {
-		opacity: 1;
-		color: var(--h-text-3);
-		background: rgb(var(--h-surface-rgb) / calc(0.06 * var(--h-fill-scale)));
+	/* see breakpoints.ts: folded, there is no rail column to follow */
+	@media (min-width: 901px) {
+		.edit-toggle.right {
+			left: auto;
+			right: calc(14px + var(--h-pad-x) + env(safe-area-inset-right));
+		}
+	}
+
+	@media (hover: hover) {
+		.edit-toggle:hover {
+			opacity: 1;
+			color: var(--h-text-3);
+			background: rgb(var(--h-surface-rgb) / calc(0.06 * var(--h-fill-scale)));
+		}
 	}
 
 	.edit-bar {

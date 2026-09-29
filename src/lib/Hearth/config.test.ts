@@ -6,14 +6,23 @@ import {
 	findOverviewCard,
 	findOverviewItemList,
 	isStack,
-	placeInSlot,
+	foldedRail,
 	foldedTopCount,
+	railDividerIndex,
+	railSides,
 	railSlots,
-	reorderSlot,
 	wildcardEntityIds,
 	type RailWidget
 } from './config';
 import { hearthConfigIssues, normalizeHearthConfig } from './normalize';
+import {
+	moveRailWidget,
+	moveToSide,
+	placeInSide,
+	placeInSlot,
+	reorderSide,
+	reorderSlot
+} from './model/railMoves';
 
 describe('normalizeHearthConfig', () => {
 	it('uses a generic, entity-free first-run fallback', () => {
@@ -332,6 +341,86 @@ describe('wall tablet settings', () => {
 	});
 });
 
+describe('sleep screen settings', () => {
+	const base = { rail: [], rooms: [{ id: 'home', cards: [[]] }] };
+
+	it('keeps valid sleep screen options', () => {
+		expect(
+			normalizeHearthConfig({
+				...base,
+				screensaver_background: 'radar',
+				screensaver_image: ' hearth-images/a.png ',
+				screensaver_radar: { latitude: 52.2, longitude: 21, zoom: 5, basemap: 'light' },
+				screensaver_show_date: false,
+				screensaver_clock_size: 'large',
+				screensaver_weather_entity: ' weather.home '
+			})
+		).toMatchObject({
+			screensaver_background: 'radar',
+			screensaver_image: 'hearth-images/a.png',
+			screensaver_radar: { latitude: 52.2, longitude: 21, zoom: 5, basemap: 'light' },
+			screensaver_show_date: false,
+			screensaver_clock_size: 'large',
+			screensaver_weather_entity: 'weather.home'
+		});
+	});
+
+	it('drops unusable options and clamps the radar zoom to what RainViewer serves', () => {
+		const config = normalizeHearthConfig({
+			...base,
+			screensaver_background: 'none',
+			screensaver_image: '  ',
+			screensaver_radar: { latitude: 120, longitude: 'east', zoom: 12, basemap: 'sepia' },
+			screensaver_show_date: 'no',
+			screensaver_clock_size: 'huge'
+		});
+		expect(config.screensaver_background).toBeUndefined();
+		expect(config.screensaver_image).toBeUndefined();
+		expect(config.screensaver_radar).toEqual({ zoom: 7 });
+		expect(config.screensaver_show_date).toBeUndefined();
+		expect(config.screensaver_clock_size).toBeUndefined();
+		expect(normalizeHearthConfig({ ...base, screensaver_radar: { zoom: 0 } })).toMatchObject({
+			screensaver_radar: { zoom: 3 }
+		});
+		expect(
+			normalizeHearthConfig({ ...base, screensaver_radar: { basemap: 1 } }).screensaver_radar
+		).toBeUndefined();
+	});
+
+	it('keeps a custom basemap only when it is a tile template', () => {
+		const radar = (tile_url: string) =>
+			normalizeHearthConfig({ ...base, screensaver_radar: { tile_url, attribution: ' Me ' } })
+				.screensaver_radar;
+		expect(radar(' https://tiles.example/{z}/{x}/{y}.png ')).toEqual({
+			tile_url: 'https://tiles.example/{z}/{x}/{y}.png',
+			attribution: 'Me'
+		});
+		expect(radar('javascript:alert(1)/{z}/{x}/{y}')).toEqual({ attribution: 'Me' });
+		expect(
+			hearthConfigIssues({ ...base, screensaver_radar: { tile_url: 'https://x/{z}.png' } })
+		).toEqual(['screensaver_radar.tile_url must be an http(s) URL with {z}, {x} and {y}']);
+	});
+
+	it('reports sleep screen values the normalizer would discard', () => {
+		expect(
+			hearthConfigIssues({
+				...base,
+				screensaver_background: 'video',
+				screensaver_radar: { latitude: 91, zoom: 9, basemap: 'sepia' },
+				screensaver_clock_size: 'huge',
+				screensaver_weather_entity: ''
+			})
+		).toEqual([
+			'screensaver_background must be none, image or radar',
+			'screensaver_radar.latitude must be -90 to 90',
+			'screensaver_radar.zoom must be 3 to 7',
+			'screensaver_radar.basemap must be dark or light',
+			'screensaver_clock_size must be small, medium or large',
+			'screensaver_weather_entity must be a non-empty string'
+		]);
+	});
+});
+
 describe('foldedTopCount', () => {
 	const rail = [
 		{ id: 'nav', type: 'nav' },
@@ -514,5 +603,156 @@ describe('moving a widget between folded runs', () => {
 	it('ignores a drop of a widget that is no longer there', () => {
 		const start = rail();
 		expect(placeInSlot(start, 'gone', 'top', 0)).toBe(start);
+	});
+});
+
+describe('sidebar position', () => {
+	const rail = () =>
+		[
+			{ id: 'clock', type: 'clock' },
+			{ id: 'energy', type: 'energy', side: 'right' },
+			{ id: 'nav', type: 'nav' },
+			{ id: 'weather', type: 'weather', side: 'right' }
+		] as RailWidget[];
+
+	const ids = (widgets: RailWidget[]) => widgets.map((widget) => widget.id);
+
+	it('splits the widgets by side only when there are two rails', () => {
+		expect(ids(railSides(rail(), 'both').left)).toEqual(['clock', 'nav']);
+		expect(ids(railSides(rail(), 'both').right)).toEqual(['energy', 'weather']);
+		expect(ids(railSides(rail(), 'left').left)).toEqual(['clock', 'energy', 'nav', 'weather']);
+		expect(railSides(rail(), 'left').right).toEqual([]);
+		expect(ids(railSides(rail(), 'right').right)).toEqual(['clock', 'energy', 'nav', 'weather']);
+		expect(railSides(rail(), 'right').left).toEqual([]);
+		expect(railSides(rail(), 'none')).toEqual({ left: [], right: [] });
+	});
+
+	it('folds both rails in stored order, and no rail to nothing', () => {
+		expect(ids(foldedRail(rail(), 'both'))).toEqual(['clock', 'energy', 'nav', 'weather']);
+		expect(ids(foldedRail(rail(), 'right'))).toEqual(['clock', 'energy', 'nav', 'weather']);
+		expect(foldedRail(rail(), 'none')).toEqual([]);
+	});
+
+	it('reorders one rail and leaves the other alone', () => {
+		const next = reorderSide(rail(), 'right', [rail()[3], rail()[1]]);
+		expect(ids(railSides(next, 'both').right)).toEqual(['weather', 'energy']);
+		expect(ids(railSides(next, 'both').left)).toEqual(['clock', 'nav']);
+	});
+
+	it('moves a widget to the rail it is dropped on', () => {
+		const next = placeInSide(rail(), 'nav', 'right', 1);
+		expect(ids(railSides(next, 'both').right)).toEqual(['energy', 'nav', 'weather']);
+		expect(ids(railSides(next, 'both').left)).toEqual(['clock']);
+		expect(next.find((widget) => widget.id === 'nav')?.side).toBe('right');
+
+		const back = placeInSide(next, 'nav', 'left', 0);
+		expect(ids(railSides(back, 'both').left)).toEqual(['nav', 'clock']);
+		expect(back.find((widget) => widget.id === 'nav')?.side).toBeUndefined();
+	});
+
+	it('copies instead of moving when asked', () => {
+		const next = placeInSide(rail(), 'clock', 'right', 0, { copy: true });
+		expect(ids(railSides(next, 'both').left)).toEqual(['clock', 'nav']);
+		expect(ids(railSides(next, 'both').right)).toEqual(['clock-2', 'energy', 'weather']);
+	});
+
+	it('moves past the next widget on the same side when there are two rails', () => {
+		const both = rail();
+		moveRailWidget(both, 0, 1, 'both');
+		expect(ids(both)).toEqual(['energy', 'nav', 'clock', 'weather']);
+		const single = rail();
+		moveRailWidget(single, 0, 1, 'left');
+		expect(ids(single)).toEqual(['energy', 'clock', 'nav', 'weather']);
+		const edge = rail();
+		moveRailWidget(edge, 2, 1, 'both');
+		expect(ids(edge)).toEqual(ids(rail()));
+	});
+
+	it('normalizes the position and each widget side', () => {
+		const config = normalizeHearthConfig({
+			rail_position: 'both',
+			rail: [
+				{ id: 'a', type: 'clock', side: 'right' },
+				{ id: 'b', type: 'clock', side: 'left' },
+				{ id: 'c', type: 'clock', side: 'middle' }
+			],
+			rooms: []
+		});
+		expect(config.rail_position).toBe('both');
+		expect(config.rail.map((widget) => widget.side)).toEqual(['right', undefined, undefined]);
+		expect(
+			normalizeHearthConfig({ rail_position: 'left', rail: [] }).rail_position
+		).toBeUndefined();
+		expect(normalizeHearthConfig({ rail_position: 'top', rail: [] }).rail_position).toBeUndefined();
+		expect(normalizeHearthConfig({ rail_position: 'none', rail: [] }).rail_position).toBe('none');
+	});
+
+	it('reports a position or side it does not know', () => {
+		const issues = hearthConfigIssues({
+			rail_position: 'top',
+			rail: [{ id: 'a', type: 'clock', side: 'middle' }],
+			rooms: [{ id: 'home', cards: [[]] }]
+		});
+		expect(issues.join('\n')).toMatch(/rail_position/);
+		expect(issues.join('\n')).toMatch(/side/);
+	});
+
+	it('keeps a folded drag across sides in the order it was dropped', () => {
+		const start = [
+			{ id: 'clock', type: 'clock' },
+			{ id: 'nav', type: 'nav' },
+			{ id: 'weather', type: 'weather', side: 'right' }
+		] as RailWidget[];
+		const top = railSlots(foldedRail(start, 'both'), { position: 'both' }).top;
+		expect(ids(top)).toEqual(['clock', 'weather']);
+		const next = reorderSlot(start, 'top', [top[1], top[0]]);
+		expect(ids(railSlots(foldedRail(next, 'both'), { position: 'both' }).top)).toEqual([
+			'weather',
+			'clock'
+		]);
+		expect(ids(railSides(next, 'both').right)).toEqual(['weather']);
+	});
+
+	it('does not divide at a gap that ends its own rail', () => {
+		const gapLast = [
+			{ id: 'clock', type: 'clock' },
+			{ id: 'weather', type: 'weather', side: 'right' },
+			{ id: 'lights', type: 'entity' },
+			{ id: 'gap', type: 'spacer' }
+		] as RailWidget[];
+		expect(railDividerIndex(gapLast, 'both')).toBe(-1);
+
+		const rightAfterGap = [
+			{ id: 'clock', type: 'clock' },
+			{ id: 'lights', type: 'entity' },
+			{ id: 'gap', type: 'spacer' },
+			{ id: 'weather', type: 'weather', side: 'right' }
+		] as RailWidget[];
+		expect(railDividerIndex(rightAfterGap, 'both')).toBe(-1);
+		expect(railDividerIndex(rightAfterGap, 'left')).toBe(2);
+		expect(ids(railSlots(rightAfterGap, { position: 'both' }).top)).toEqual(['clock', 'weather']);
+
+		const dividing = [...rightAfterGap, { id: 'energy', type: 'energy' }] as RailWidget[];
+		expect(railDividerIndex(dividing, 'both')).toBe(2);
+	});
+
+	it('sends a widget to the end of the rail it is moved to', () => {
+		const toRight = moveToSide(rail(), 'clock', 'right');
+		expect(ids(toRight)).toEqual(['energy', 'nav', 'weather', 'clock']);
+		expect(toRight.at(-1)?.side).toBe('right');
+
+		const toLeft = moveToSide(rail(), 'weather', 'left');
+		expect(ids(toLeft)).toEqual(['clock', 'energy', 'nav', 'weather']);
+		expect(toLeft.find((widget) => widget.id === 'weather')?.side).toBeUndefined();
+
+		const emptyLeft = moveToSide(
+			[
+				{ id: 'a', type: 'clock', side: 'right' },
+				{ id: 'b', type: 'clock', side: 'right' }
+			] as RailWidget[],
+			'b',
+			'left'
+		);
+		expect(ids(emptyLeft)).toEqual(['b', 'a']);
 	});
 });

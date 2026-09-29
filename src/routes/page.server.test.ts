@@ -7,7 +7,7 @@ vi.mock('fs/promises', () => ({ readFile: vi.fn() }));
 
 beforeEach(() => {
 	vi.mocked(readFile).mockResolvedValue('');
-	vi.stubEnv('HASS_URL', 'http://homeassistant:8123');
+	vi.stubEnv('HASS_URL', 'http://homeassistant.local:8123');
 	vi.stubEnv('HASS_PUBLIC_URL', '');
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -28,11 +28,11 @@ async function configuration(ingress = false) {
 describe('browser Home Assistant URL', () => {
 	it('uses the forwarded Home Assistant origin under Ingress instead of the internal server address', async () => {
 		expect((await configuration(true)).hassUrl).toBe('https://example.ui.nabu.casa');
-		expect(process.env.HASS_URL).toBe('http://homeassistant:8123');
+		expect(process.env.HASS_URL).toBe('http://homeassistant.local:8123');
 	});
 
 	it('preserves the configured URL for direct access', async () => {
-		expect((await configuration()).hassUrl).toBe('http://homeassistant:8123');
+		expect((await configuration()).hassUrl).toBe('http://homeassistant.local:8123');
 	});
 
 	it.each([true, false])(
@@ -42,7 +42,7 @@ describe('browser Home Assistant URL', () => {
 			expect((await configuration(ingress)).hassUrl).toBe(
 				ingress ? 'https://example.ui.nabu.casa' : 'https://ha.example.com'
 			);
-			expect(process.env.HASS_URL).toBe('http://homeassistant:8123');
+			expect(process.env.HASS_URL).toBe('http://homeassistant.local:8123');
 		}
 	);
 

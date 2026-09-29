@@ -148,8 +148,10 @@
 		cursor: pointer;
 	}
 
-	.row:hover {
-		border-color: rgb(var(--h-accent-rgb) / calc(0.35 * var(--h-accent-scale)));
+	@media (hover: hover) {
+		.row:hover {
+			border-color: rgb(var(--h-accent-rgb) / calc(0.35 * var(--h-accent-scale)));
+		}
 	}
 
 	.kind-icon {

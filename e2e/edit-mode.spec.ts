@@ -169,6 +169,46 @@ test('the theme editor floats over the dashboard and drags by its header', async
 	expect(errors).toEqual([]);
 });
 
+test('an uploaded image backs a header card and the theme', async ({ page }) => {
+	const errors = collectPageErrors(page);
+	const png = Buffer.from(
+		'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+		'base64'
+	);
+
+	await page.getByRole('button', { name: 'Add card' }).click();
+	const sheet = page.getByRole('dialog', { name: 'Add card' });
+	await sheet.getByRole('option', { name: /^Header\b/ }).click();
+	await sheet
+		.locator('input[type="file"]')
+		.setInputFiles({ name: 'room.png', mimeType: 'image/png', buffer: png });
+	// re-encoded in the browser before it is sent
+	await expect(sheet.getByLabel('Background image')).toHaveValue(
+		/^hearth-images\/[a-f0-9]{32}\.webp$/
+	);
+	await sheet.getByRole('button', { name: 'Done' }).click();
+
+	const backdrop = page.locator('.header.banner img.backdrop');
+	await expect(backdrop).toBeVisible();
+	await expect
+		.poll(() => backdrop.evaluate((image: HTMLImageElement) => image.naturalWidth))
+		.toBeGreaterThan(0);
+
+	await page.getByRole('button', { name: 'Theme' }).click();
+	const theme = page.getByRole('dialog', { name: 'Theme' });
+	await theme.getByRole('button', { name: 'Uploaded images' }).click();
+	await theme
+		.getByRole('button', { name: /^Use this image/ })
+		.first()
+		.click();
+	await expect(page.locator('.frame')).toHaveCSS(
+		'--h-bg-image',
+		/^url\("http:\/\/[^"]+\/_api\/hearth_images\/[a-f0-9]{32}\.webp"\)$/
+	);
+
+	expect(errors).toEqual([]);
+});
+
 test('the colour picker edits a knob in place and previews it live', async ({ page }) => {
 	const errors = collectPageErrors(page);
 

@@ -10,10 +10,18 @@
 	import { states } from '$lib/core/ha/entities';
 	import { layerDepth } from '$lib/ui/layers';
 	import { FOLD_QUERY } from '../breakpoints';
+	import { railPositionOf } from '../config';
 	import { searchAvailable } from '../visibility';
 
 	/** Global shortcuts: f for search, cmd/ctrl+s and cmd/ctrl+z while editing. */
 	let { onsearch }: { onsearch: () => void } = $props();
+
+	// whether a search widget hidden on mobile counts as gone; with no rail
+	// there is nothing to fold, so any search widget keeps search available
+	function mobileHidingApplies(): boolean {
+		if (railPositionOf($hearthConfig) === 'none') return false;
+		return window.matchMedia?.(FOLD_QUERY).matches ?? false;
+	}
 
 	function handleKeydown(event: KeyboardEvent) {
 		const target = event.target as HTMLElement;
@@ -27,7 +35,7 @@
 			!event.metaKey &&
 			!event.ctrlKey &&
 			!event.altKey &&
-			searchAvailable($hearthConfig.rail, $states, window.matchMedia?.(FOLD_QUERY).matches ?? false)
+			searchAvailable($hearthConfig.rail, $states, mobileHidingApplies())
 		) {
 			event.preventDefault();
 			onsearch();

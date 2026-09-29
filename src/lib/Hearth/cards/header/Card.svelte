@@ -11,4 +11,5 @@
 	subtitle={card.subtitle}
 	tempEntity={card.temp_entity}
 	humidityEntity={card.humidity_entity}
+	backgroundImage={card.background_image}
 />

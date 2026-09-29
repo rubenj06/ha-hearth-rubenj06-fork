@@ -1,4 +1,5 @@
 import * as v from 'valibot';
+import { isTileUrl, RADAR_ZOOM } from './config';
 
 /*
  * Field-level schemas for the shapes that recur across card and widget types.
@@ -25,6 +26,12 @@ export const OptionalEntityIdList = v.optional(
 
 export function optionalNumberAtLeast(min: number) {
 	return v.optional(v.pipe(FiniteNumber, v.minValue(min, `must be at least ${min}`)));
+}
+
+/** An optional number from min to max inclusive. */
+export function optionalNumberInRange(min: number, max: number) {
+	const message = `must be ${min} to ${max}`; // copy ok: yaml diagnostic
+	return v.optional(v.pipe(FiniteNumber, v.minValue(min, message), v.maxValue(max, message)));
 }
 
 /** A card or widget height in px, matching normalizeHeight. */
@@ -155,6 +162,7 @@ export const CardSharedSchema = v.looseObject({
 export const WidgetSharedSchema = v.looseObject({
 	mobile: v.optional(v.picklist(['top', 'bottom', 'hidden'], 'must be top, bottom or hidden')),
 	hide_mobile: OptionalFlag,
+	side: v.optional(v.picklist(['left', 'right'], 'must be left or right')),
 	visibility: VisibilityListSchema
 });
 
@@ -196,13 +204,40 @@ export const RootSettingsSchema = v.looseObject({
 	theme: v.optional(ThemeSchema),
 	theme_night: v.optional(ThemeSchema),
 	day_night: v.optional(DayNightSwitchSchema),
+	rail_position: v.optional(
+		v.picklist(['left', 'right', 'both', 'none'], 'must be left, right, both or none')
+	),
 	screensaver_minutes: optionalNumberAtLeast(1),
 	screensaver_drift: OptionalFlag,
-	screensaver_brightness: v.optional(
-		v.pipe(FiniteNumber, v.minValue(10, 'must be 10 to 100'), v.maxValue(100, 'must be 10 to 100'))
+	screensaver_brightness: optionalNumberInRange(10, 100),
+	screensaver_background: v.optional(
+		v.picklist(['none', 'image', 'radar'], 'must be none, image or radar')
 	),
+	screensaver_image: OptionalText,
+	screensaver_radar: v.optional(
+		v.object({
+			latitude: optionalNumberInRange(-90, 90),
+			longitude: optionalNumberInRange(-180, 180),
+			zoom: optionalNumberInRange(RADAR_ZOOM.min, RADAR_ZOOM.max),
+			basemap: v.optional(v.picklist(['dark', 'light'], 'must be dark or light')),
+			tile_url: v.optional(
+				v.pipe(
+					v.string('must be text'),
+					v.check(isTileUrl, 'must be an http(s) URL with {z}, {x} and {y}')
+				)
+			),
+			attribution: OptionalText
+		})
+	),
+	screensaver_show_date: OptionalFlag,
+	screensaver_clock_size: v.optional(
+		v.picklist(['small', 'medium', 'large'], 'must be small, medium or large')
+	),
+	screensaver_weather_entity: OptionalEntityId,
 	keep_screen_on: OptionalFlag,
 	scroll_edge_blur: OptionalFlag,
+	swipe_navigation_mobile: OptionalFlag,
+	swipe_navigation_desktop: OptionalFlag,
 	padding_x: optionalNumberAtLeast(0),
 	padding_y: optionalNumberAtLeast(0)
 });
