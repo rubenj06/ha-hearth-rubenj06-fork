@@ -91,6 +91,13 @@ rail:
     type: iframe
     url: about:blank
     height: 120
+  # fork: styled clock examples
+  - id: styled-clock-analog
+    type: styled_clock
+    show_seconds: true
+  - id: styled-clock-flip
+    type: styled_clock
+    style: flip
   - id: spacer
     type: spacer
 rooms:

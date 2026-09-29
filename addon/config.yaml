@@ -4,7 +4,7 @@
 name: Hearth (fork)
 # <upstream Hearth version>.<fork release>; raising it offers an update that
 # rebuilds from the fork's current master
-version: 0.3.0.1
+version: 0.3.0.2
 slug: hearth_fork
 description: Hearth dashboard built from the rubenj06/ha-hearth-rubenj06-fork fork
 arch:

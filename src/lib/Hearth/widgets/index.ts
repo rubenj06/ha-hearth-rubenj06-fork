@@ -9,6 +9,8 @@ import { notificationsWidget } from './notifications/descriptor';
 import { templateWidget } from './template/descriptor';
 import { timerWidget } from './timer/descriptor';
 import { clockWidget } from './clock/descriptor';
+// fork: styled clock widget
+import { styledClockWidget } from './styled_clock/descriptor';
 import { energyWidget } from './energy/descriptor';
 import { entityWidget } from './entity/descriptor';
 import { labelWidget } from './label/descriptor';
@@ -23,6 +25,7 @@ export type { WidgetDescriptor, WidgetDraft, WidgetEditorProps, WidgetFields } f
 
 const REGISTERED = [
 	clockWidget,
+	styledClockWidget, // fork: styled clock widget
 	weatherWidget,
 	navWidget,
 	searchWidget,

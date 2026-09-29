@@ -31,6 +31,8 @@ import { notificationsWidget } from './widgets/notifications';
 import { templateWidget } from './widgets/template';
 import { timerWidget } from './widgets/timer';
 import { clockWidget } from './widgets/clock';
+// fork: styled clock widget
+import { styledClockWidget } from './widgets/styled_clock';
 import { energyWidget } from './widgets/energy';
 import { entityWidget } from './widgets/entity';
 import { labelWidget } from './widgets/label';
@@ -48,6 +50,7 @@ export const WIDGET_DEFINITIONS = [
 	templateWidget,
 	timerWidget,
 	clockWidget,
+	styledClockWidget, // fork: styled clock widget
 	energyWidget,
 	entityWidget,
 	labelWidget,
