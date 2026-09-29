@@ -23,7 +23,8 @@ function isFlexibleGap(widget: RailWidget): boolean {
  * after it, and cheap enough in height to put there. Search is not among them:
  * the folded layout's page switcher carries it.
  */
-const GLANCE_TYPES = new Set<RailWidget['type']>(['clock', 'weather']);
+// fork: styled_clock rides above the page on phones like the clock
+const GLANCE_TYPES = new Set<RailWidget['type']>(['clock', 'styled_clock', 'weather']);
 
 /**
  * The gap that divides the rail's two folded runs: a flexible gap with

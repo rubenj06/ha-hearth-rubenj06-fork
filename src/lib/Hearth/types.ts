@@ -53,6 +53,16 @@ type RailWidgetVariant =
 			hour_format?: 'auto' | '12' | '24';
 			show_seconds?: boolean;
 	  }
+	// fork: analog or flip-card clock, see widgets/styled_clock
+	| {
+			id: string;
+			type: 'styled_clock';
+			style?: 'analog' | 'flip';
+			timezone?: string;
+			hour_format?: 'auto' | '12' | '24';
+			show_seconds?: boolean;
+			hide_date?: boolean;
+	  }
 	| { id: string; type: 'weather'; entity?: string }
 	| { id: string; type: 'search' }
 	| { id: string; type: 'nav' }
